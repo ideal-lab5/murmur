@@ -13,13 +13,12 @@ pub struct BOTPGenerator {
 impl BOTPGenerator {
     /// create a new BOTP generator with the given seed
     pub fn new(seed: Vec<u8>) -> Self {
-
         let secret = Secret::Raw(seed.to_vec()).to_bytes().unwrap();
         let totp = TOTP::new(
             Algorithm::SHA256, // algorithm
             6,                 // num digits
             1,                 // skew
-            1,                // step
+            1,                 // step
             secret             // secret
         ).unwrap();
 
