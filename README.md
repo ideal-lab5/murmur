@@ -23,7 +23,7 @@ cargo test
 ## Usage
 
 ``` shell
-murmur-cli new --seed [] --name [] --schedule 100 101 209...
+./target/debug/murmur-cli new --name test --seed my_secret_key --schedule 100 110 120
 ```
 
 ## Generating metadata for the chain

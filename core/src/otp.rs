@@ -1,12 +1,28 @@
-//! # #[cfg(not(feature = "otpauth"))] {
-//! use etf_otp::{BOTPGenerator};
-//!
-//! let totp = BOTPGenerator::new(b"123456789123456789123456".to_vec());
-//! let otp = totp.generate(1);
-//!
-use totp_rs::{Secret, TOTP, Algorithm};
+/*
+ * Copyright 2024 by Ideal Labs, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
+use totp_rs::{Secret, TOTP, Algorithm};
+use alloc::{
+    vec::Vec,
+    string::String,
+};
+
+/// a block based otp generator
 pub struct BOTPGenerator {
+    /// the time-based otp generator
     totp: TOTP
 }
 
@@ -25,6 +41,7 @@ impl BOTPGenerator {
         BOTPGenerator { totp }
     }
 
+    /// generate an otp code
     pub fn generate(&self, block_height: u32) -> String {
         self.totp.generate(block_height as u64)
     }

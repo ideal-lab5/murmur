@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 by Ideal Labs, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #![allow(missing_docs)]
 use subxt::{
     client::OnlineClient,
@@ -31,6 +47,16 @@ use rand_chacha::{
     rand_core::SeedableRng,
 };
 
+use std::io;
+
+// use ratatui::{
+//     crossterm::event::{self, KeyCode, KeyEventKind},
+//     style::Stylize,
+//     widgets::Paragraph,
+//     DefaultTerminal,
+// };
+
+use node_template_runtime::{self, OtpCall, RuntimeCall, BalancesCall};
 
 use subxt::ext::codec::Encode;
 use beefy::{known_payloads, Payload, Commitment, VersionedFinalityProof};
@@ -90,24 +116,244 @@ struct WalletCreationDetails {
 
 #[derive(Parser)]
 struct WalletExecuteDetails {
-    #[arg()]
-    name: String,
-    #[arg()]
-    password: String,
     #[arg(long)]
-    block_number: u64,
+    name: String,
+    #[arg(long)]
+    seed: String,
+    #[arg(long)]
+    when: BlockNumber,
     #[arg(short, long)]
     amount: String,
 }
 
-use sha3::Digest;
+pub enum CLIError {
+
+}
+
+// use sha3::Digest;
+
+// fn main() -> io::Result<()>  {
+//     let mut terminal = ratatui::init();
+//     terminal.clear()?;
+//     let app_result = run(terminal);
+//     ratatui::restore();
+//     app_result
+// }
+
+// fn run(mut terminal: DefaultTerminal) -> io::Result<()> {
+//     loop {
+//         terminal.draw(|frame| {
+//             let greeting = Paragraph::new("Hello Ratatui! (press 'q' to quit)")
+//                 .white()
+//                 .on_blue();
+//             frame.render_widget(greeting, frame.area());
+//         })?;
+
+//         if let event::Event::Key(key) = event::read()? {
+//             if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
+//                 return Ok(());
+//             }
+//         }
+//     }
+// }
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+    let before = Instant::now();
+    // first we need to connect to a node and fetch the round key and current block number
+    println!("🎲 Connecting to Ideal network (local node)");
+            
+    let rpc_client = RpcClient::from_url("ws://localhost:9944").await?;
+    let client = OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
+    println!("🔗 RPC Client: connection established");
+     
+    // fetch the round public key from etf runtime storage
+    let round_key_query = subxt::dynamic::storage("Etf", "RoundPublic", ());
+    let result = client
+        .storage()
+        .at_latest()
+        .await?
+        .fetch(&round_key_query)
+        .await?;
+    let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
+
+    let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes).unwrap();
+    println!("🔑 Successfully retrieved the round public key.");
+    let current_block = client.blocks().at_latest().await?;
+    let current_block_number = current_block.header().number;
+
+    println!("🧊 Current block number: #{:?}", current_block_number);
+    let etf = OnlineClient::<SubstrateConfig>::new().await?;
+
+    // let mut mmr_store_file = File::create("mmr_store").unwrap();
+    let store = MemStore::default();
+    let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
+
+    // TODO: HKDF? just hash the seed?
+    let ephem_msk = [1;32];
+
+    match &cli.commands {
+        Commands::New(args) => {        
+            println!("🏭 Murmur: Generating Merkle mountain range");
+            // create leaves
+            let leaves = murmur::create::<TinyBLS377>(
+                args.seed.clone().into(),
+                args.schedule.clone(),
+                ephem_msk,
+                round_pubkey,
+            );
+            // populate MMR
+            leaves.iter().for_each(|leaf| {
+                // TODO: error handling
+                mmr.push(leaf.1.clone()).unwrap();
+            });
+
+            println!("Write leaves {:?}", leaves.len());
+            write_leaves(&leaves);
+
+            let root = mmr.get_root()
+                .expect("The MMR root should be calculable");
+            let name = args.name.as_bytes().to_vec();
+
+            // prepare and send tx from 'alice' account (for now)
+            // should be configurable
+            let create_anon_tx = etf::tx()
+                .otp()
+                .create(
+                    root.0.into(), 
+                    etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(name));
+            // TODO: make the origin configurable
+            let from = dev::alice();
+            let events = etf
+                .tx()
+                .sign_and_submit_then_watch_default(&create_anon_tx, &from)
+                .await?;
+            println!("✅ MMR proxy account creation successful!");
+            
+        },
+        Commands::Execute(args) => {
+            
+            // build balance transfer
+            let bob = AccountKeyring::Bob.to_account_id().into();
+            // get the value argument
+            let v: u128 = args.amount
+                .split_whitespace()
+                .map(|r| r.replace('_', "").parse().unwrap())
+                .collect::<Vec<_>>()[0];
+            let balance_transfer_call = RuntimeCall::Balances(
+                BalancesCall::transfer_allow_death {
+                    dest: bob,
+                    value: v,
+            });
+            handle_execute::<TinyBLS377>(
+                etf.clone(),
+                args.name.clone().as_bytes().to_vec(),
+                args.seed.clone().as_bytes().to_vec(),
+                args.when.clone(),
+                ephem_msk,
+                round_pubkey,
+                balance_transfer_call,
+            ).await;
+        }, 
+        _ => panic!("Hey, don't do that!"),
+    }
+    println!("Elapsed time: {:.2?}", before.elapsed());
+    Ok(())
+}
+
+fn handle_create() {
+
+}
+
+async fn handle_execute<E: EngineBLS>(
+    etf: OnlineClient<SubstrateConfig>,
+    name: Vec<u8>,
+    seed: Vec<u8>,
+    when: BlockNumber,
+    ephemeral_msk: [u8;32],
+    pk: DoublePublicKey<E>,
+    call: RuntimeCall,
+) -> Option<()> {
+    println!("Murmur: Execute Wallet Balance Transfer");
+    let mut rng = ChaCha20Rng::seed_from_u64(1);
+
+    let leaves: Vec<(BlockNumber, Leaf)> = load_leaves();
+
+    let call_data = call.encode();
+    let params = murmur::execute::<E>(
+        seed,
+        when,
+        call_data,
+        leaves.clone(),
+    ).map_err(|e| println!("Murmur execution failed due to {:?}", e)).unwrap();
+
+    let root: Leaf = params.0;
+    let hash: Vec<u8> = params.1;
+    let proof: MerkleProof<Leaf, MergeLeaves> = params.2;
+    let target_leaf: Leaf = params.3;
+    let pos: u64 = params.4;
+
+    let proof_items: Vec<Vec<u8>> = proof.proof_items().iter()
+        .map(|leaf| leaf.0.to_vec().clone())
+        .collect::<Vec<_>>();
+
+    let bounded = <BoundedVec<_, ConstU32<32>>>::truncate_from(name);
+
+    
+    let proxy_call = RuntimeCall::Otp(OtpCall::proxy {
+        name: bounded,
+        position: pos,
+        size: leaves.len() as u64,
+        ciphertext_bytes: target_leaf.0,
+        proof: proof_items,
+        call: Box::new(call),
+        when,
+        hash,
+    });
+
+    // let proxy_call = etf::tx().otp().proxy(
+    //     bounded,
+    //     pos,
+    //     leaves.len() as u64,
+    //     target_leaf.0,
+    //     hash,
+    //     proof_items,
+    //     Box::new(call),
+    //     when,
+    // );
+
+    let proxy_call_bytes: &[u8] = &proxy_call.encode();
+
+    // then construct a scheduled transaction for "when"
+    // 1. tlock
+    let timelocked_proxy_call = murmur::timelock_encrypt::<E>(
+        when,
+        pk.1,
+        ephemeral_msk,
+        proxy_call_bytes,
+    );
+    let bounded_ciphertext = etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(timelocked_proxy_call);
+    // 2. build tx
+    let sealed_tx = etf::tx()
+        .scheduler()
+        .schedule_sealed(when, 127, bounded_ciphertext);
+    // 3. submit tx
+    
+    let events = etf
+        .tx()
+        .sign_and_submit_then_watch_default(&sealed_tx, &dev::alice())
+        .await;
+    None
+
+}
 
 /// read an MMR from a file
-fn load_leaves() -> Vec<(u64, Leaf)> {
+fn load_leaves() -> Vec<(BlockNumber, Leaf)> {
     let mmr_store_file = File::open("mmr_store")
         .expect("Unable to open file");
-    let leaves: Vec<(u64, Leaf)> = serde_cbor::from_reader(mmr_store_file)
-        .unwrap();
+    let leaves: Vec<(BlockNumber, Leaf)> = 
+        serde_cbor::from_reader(mmr_store_file).unwrap();
     leaves
 }
 
@@ -118,139 +364,6 @@ fn write_leaves(leaves: &[(BlockNumber, Leaf)]) {
     serde_cbor::to_writer(mmr_store_file, &leaves)
         .unwrap();
 }
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-   
-    let cli = Cli::parse();
-
-    let before = Instant::now();
-    match &cli.commands {
-        Commands::New(args) => {
-            // first we need to connect to a node and fetch the round key and current block number
-            println!("🎲 Connecting to Ideal network (local node)");
-            
-            let rpc_client = RpcClient::from_url("ws://localhost:9944").await?;
-            let client = OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
-            println!("🔗 RPC Client: connection established");
-            
-            // fetch the round public key from etf runtime storage
-            let round_key_query = subxt::dynamic::storage("Etf", "RoundPublic", ());
-            let result = client
-                .storage()
-                .at_latest()
-                .await?
-                .fetch(&round_key_query)
-                .await?;
-            let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
-    
-            let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes).unwrap();
-            println!("🔑 Successfully retrieved the round public key.");
-            let current_block = client.blocks().at_latest().await?;
-            let current_block_number = current_block.header().number;
-
-            println!("🧊 Current block number: #{:?}", current_block_number);
-            println!("🏭 Murmur: Generating Merkle mountain range");
-
-            let etf = OnlineClient::<SubstrateConfig>::new().await?;
-
-            let mut mmr_store_file = File::create("mmr_store").unwrap();
-            let store = MemStore::default();
-            let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
-
-            // TODO: HKDF? just hash the seed?
-            let ephem_msk = [1;32];
-            let leaves = murmur::create::<TinyBLS377>(
-                args.seed.clone().into(),
-                args.schedule.clone(),
-                ephem_msk,
-                round_pubkey,
-            );
-
-            leaves.iter().for_each(|leaf| {
-                // TODO: error handling
-                mmr.push(leaf.1.clone()).unwrap();
-            });
-
-            write_leaves(&leaves);
-
-            let root = mmr.get_root()
-                .expect("The MMR root should be calculable");
-
-            let name = args.name.as_bytes().to_vec();
-
-            let create_anon_tx = etf::tx()
-                .otp()
-                .create(
-                    root.0.into(), 
-                    etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(name));
-            // TODO: make the origin a parameter
-            let from = dev::alice();
-            let events = etf
-                .tx()
-                .sign_and_submit_then_watch_default(&create_anon_tx, &from)
-                .await?;
-            println!("✅ MMR proxy account creation successful!");
-            
-        }
-        _ => panic!("Hey, don't do that!"),
-    }
-    println!("Elapsed time: {:.2?}", before.elapsed());
-    Ok(())
-}
-
-
-/// construct the encoded commitment for the round in which block_number h
-async fn get_validator_set_id(
-    client: OnlineClient<SubstrateConfig>,
-    block_number: BlockNumber,
-) -> Result<u64, Box<dyn std::error::Error>>  {
-    let epoch_index_query = subxt::dynamic::storage("Beefy", "ValidatorSetId", ());
-    let result = client.storage()
-        .at_latest()
-        .await?
-        .fetch(&epoch_index_query)
-        .await?;
-    let epoch_index = result.unwrap().as_type::<u64>()?;
-    
-    Ok(epoch_index)
-}
-
-/// perform timelock encryption over BLS12-377
-async fn tlock_encrypt<E: EngineBLS>(
-    client: OnlineClient<SubstrateConfig>,
-    round_pubkey: E::PublicKeyGroup,
-    message: Vec<u8>,
-    target: BlockNumber,
-) -> Result<TLECiphertext<E>, Box<dyn std::error::Error>> {
-    println!("🔒 Encrypting the message for target block #{:?}", target);
-    // let msk = SecretKey(E::Scalar::rand(&mut OsRng));
-    let epoch_index = get_validator_set_id(client.clone(), target).await?;
-    let payload = Payload::from_single_entry(known_payloads::ETF_SIGNATURE, Vec::new());
-    let commitment = Commitment { payload, block_number: target, validator_set_id: epoch_index };
-    // validators sign the SCALE encoded commitment, so that becomes our identity for TLE as well
-    let id = Identity::new(&commitment.encode());
-    // generate a random secret key
-    let sk: [u8;32] = [1;32];
-    // 2) tlock for encoded commitment (TODO: error handling)
-    let ciphertext = tle(
-        round_pubkey,
-        sk,
-        &message,
-        id,
-        OsRng,
-    ).unwrap();
-    Ok(ciphertext)
-}
-
-// /// perform timelock encryption over BLS12-377
-// async fn tlock_decrypt<E: EngineBLS>(
-//     ciphertext: TLECiphertext<E>,
-//     signatures: Vec<IBESecret<E>>,
-// ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-//     let result = ciphertext.decrypt(signatures).unwrap();
-//     Ok(result.message)
-// }
 
 #[cfg(test)]
 mod tests {

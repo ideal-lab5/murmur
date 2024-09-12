@@ -23,7 +23,7 @@ serde_json = "1.0.108"
 indicatif = "0.17.8"
 sp-keyring = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
 frame-support = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
-# node-runtime = { path = "../etf/runtime" }
+node-template-runtime = { path = "../../etf/runtime" }
 codec = { package = "parity-scale-codec", version = "3.6.12", features = [
 	"derive",
 ] }
@@ -43,3 +43,5 @@ getrandom = { version = "0.2", features = ["js"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 hex = "0.4.3"
 array-bytes = "6.1"
+ratatui = "0.28.1"
+crossterm = "0.28.1"

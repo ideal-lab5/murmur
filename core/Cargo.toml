@@ -15,40 +15,29 @@ workspace = true
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-subxt = "0.35.2"
-subxt-signer = "0.35.2"
-tokio = { version = "1.35", features = ["macros", "time", "rt-multi-thread"] }
 totp-rs = "5.5.1"
-etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "tony/dev" } 
-# etf-crypto-primitives = { path = "../etf-sdk/etf-crypto-primitives" }
-clap = { version = "4.1.1", features = ["derive"] }
+codec = { package = "parity-scale-codec", version = "3.6.12", features = ["derive"], default-features = false }
+etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "tony/dev", default-features = false} 
 rand_chacha = "0.3.1"
 ckb-merkle-mountain-range = "0.5.2"
-# blake2b = "0.10.6"
 sha3 = "0.10.8"
-serde_cbor = "0.11.2"
-# bytes = "1.4.0"
-serde_json = "1.0.108"
-indicatif = "0.17.8"
-sp-keyring = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
-frame-support = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
-# node-runtime = { path = "../etf/runtime" }
-codec = { package = "parity-scale-codec", version = "3.6.12", features = [
-	"derive",
-] }
-serde = { version = "1.0.188", features = ["alloc", "derive"] }
-sp-core = { git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing", features = ["bls-experimental"] }
-sp-runtime = { git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
+# serde_cbor = "0.11.2"
+# serde_json = "1.0.108"
+serde = { version = "1.0.188", features = ["alloc", "derive"], default-features = false}
 beefy = { package = "sp-consensus-beefy-etf", git = "https://github.com/ideal-lab5/etf.git", branch = "tony/dev", features = ["bls-experimental"] } 
-sp-application-crypto = { git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing", features = ["bls-experimental"] }
+ark-bls12-377 = { version = "0.4.0", default-features = false }
+ark-std = { version = "0.4.0", default-features = false }
+ark-ff = { version = "0.4.0", default-features = false }
+ark-serialize = { version = "0.4.0", default-features = false }
+w3f-bls = { version = "0.1.3", default-features = false }
+getrandom = { version = "0.2", features = ["js"], default-features = false }
+rand_core = { version = "0.6.4", features = ["getrandom"], default-features = false }
+hex = { version = "0.4.3" }
+array-bytes = { version = "6.1" }
+# add zeroize 
+# 1.8.1
 
-ark-bls12-377 = "0.4.0"
-ark-std = "0.4.0"
-ark-ec = "0.4.0"
-ark-ff = "0.4.0"
-ark-serialize = "0.4.0"
-w3f-bls = "0.1.3"
-getrandom = { version = "0.2", features = ["js"] }
-rand_core = { version = "0.6.4", features = ["getrandom"] }
-hex = "0.4.3"
-array-bytes = "6.1"
+[features]
+default = ["std"]
+std = ["ark-std/std", "getrandom/std", "rand_core/std", "serde/std", "sha3/std", "codec/std"]
+no_std = []
