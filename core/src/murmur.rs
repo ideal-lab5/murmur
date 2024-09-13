@@ -43,6 +43,10 @@ pub enum Error {
     ExecuteError
 }
 
+// TODO: create an 'identity builder' trait and inject into the create function
+// then remove the dependency on beefy here
+// and implement an identity builder in the cli component
+
 /// creates the leaves needed to generate an MMR
 /// This function generates otp codes for the given block schedule
 /// then it encrypts the resulting codes and constructs leaves 
