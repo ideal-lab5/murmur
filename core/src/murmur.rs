@@ -17,7 +17,7 @@
 //! The murmur protocol implementation
 //!
 
-use alloc::{vec, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 use crate::otp::BOTPGenerator;
 use crate::types::*;
 use etf_crypto_primitives::{
@@ -33,14 +33,10 @@ use ckb_merkle_mountain_range::{
     },
 };
 use ark_serialize::CanonicalSerialize;
-use beefy::{
-    known_payloads, 
-    Payload, 
-    Commitment,
-};
 use codec::Encode;
 use rand_core::OsRng;
 use sha3::Digest;
+use beefy::{known_payloads, Payload, Commitment, VersionedFinalityProof};
 
 #[derive(Debug)]
 pub enum Error {
@@ -64,8 +60,9 @@ pub fn create<E: EngineBLS>(
 
     for i in &block_schedule {
         let otp_code = totp.generate(*i);
+        let identity = build_identity(*i);
         let ct_bytes = timelock_encrypt::<E>(
-            *i,
+            identity,
             pk.1,
             ephemeral_msk,
             otp_code.as_bytes(),
@@ -78,14 +75,13 @@ pub fn create<E: EngineBLS>(
 }
 
 /// computes parameters needed to execute a transaction at the specified block number
-/// outputs (ciphertext, hash, merkle proof, position/index)
-/// TODO: create a new struct to represent return type
+/// outputs a payload containing: (ciphertext, hash, merkle proof, position/index)
 pub fn execute<E: EngineBLS>(
     seed: Vec<u8>,
     when: BlockNumber,
-    call_data: Vec<u8>,
+    aux_data: Vec<u8>,
     leaves: Vec<(BlockNumber, Leaf)>,
-) -> Result<(Leaf, Vec<u8>,  MerkleProof<Leaf, MergeLeaves>, Leaf, u64), Error> {
+) -> Result<ExecutionPayload, Error> {
     // rebuild the MMR and search for the position of the leaf for the given block number
     let store = MemStore::default();
     let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
@@ -114,35 +110,81 @@ pub fn execute<E: EngineBLS>(
     let otp_code = botp.generate(when);
     let mut hasher = sha3::Sha3_256::default();
     hasher.update(otp_code.as_bytes());
-    hasher.update(&call_data);
+    hasher.update(&aux_data);
     let hash = hasher.finalize().to_vec();
 
-    Ok((root, hash, proof, target_leaf, target_pos))
+    let payload = ExecutionPayload {
+        root,
+        proof,
+        target: target_leaf,
+        pos: target_pos,
+        hash,
+        sk: Vec::new(),
+    };
+    Ok(payload)
+}
+
+/// verify the correctness of a proof 
+/// e.g. would be called by the pallet/runtime
+pub fn verify(
+    root: Leaf, 
+    otp: String, 
+    aux_data: Vec<u8>, 
+    payload: ExecutionPayload
+) -> bool {
+    // verify the merkle proof
+    let proof = payload.proof;
+    let pos = payload.pos;
+    let target = payload.target;
+
+    let mut validity = proof.verify(root, vec![(pos, target)])
+        .unwrap_or(false);
+
+    if validity {
+        // verify the hash
+        let mut hasher = sha3::Sha3_256::default();
+        hasher.update(otp.as_bytes().to_vec());
+        hasher.update(aux_data);
+        let hash = hasher.finalize();
+
+        validity = validity 
+            && hash.to_vec() == payload.hash;
+    }
+
+    validity
 }
 
 /// timelock encryption function
 pub fn timelock_encrypt<E: EngineBLS>(
-    when: BlockNumber,
+    identity: Identity,
     pk: E::PublicKeyGroup,
     ephemeral_msk: [u8;32],
     message: &[u8],
 ) -> Vec<u8> {
+    let ciphertext = tle::<E, OsRng>(
+        pk.clone(), 
+        ephemeral_msk.clone(),
+        message,
+        identity,
+        OsRng, // TODO
+    ).unwrap(); // TODO: Error Handling
+    let mut ct_bytes = Vec::new();
+    ciphertext.serialize_compressed(&mut ct_bytes).unwrap();
+    ct_bytes
+}
+
+
+/// build an identity based on the block number
+/// in the future we can consider abstracting this functionality to work with identities constructed in different ways
+/// e.g. if we want to support multiple beacons
+pub fn build_identity(when: BlockNumber) -> Identity {
     let payload = Payload::from_single_entry(known_payloads::ETF_SIGNATURE, Vec::new());
     let commitment = Commitment {
         payload, 
         block_number: when, 
         validator_set_id: 0, // TODO: how to ensure correct validator set ID is used? could just always set to 1 for now, else set input param.
     };
-    let ciphertext = tle::<E, OsRng>(
-        pk.clone(), 
-        ephemeral_msk.clone(),
-        message,
-        Identity::new(&commitment.encode()),
-        OsRng, // TODO
-    ).unwrap(); // TODO: Error Handling
-    let mut ct_bytes = Vec::new();
-    ciphertext.serialize_compressed(&mut ct_bytes).unwrap();
-    ct_bytes
+    Identity::new(&commitment.encode())
 }
 
 /// build a block-otp generator from the seed
@@ -152,7 +194,6 @@ fn build_generator(seed: &[u8]) -> BOTPGenerator {
     let hash = hasher.finalize();
     BOTPGenerator::new(hash.to_vec())
 }
- 
 
 mod tests {
     
@@ -183,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    pub fn it_can_generate_valid_merkle_proofs_and_hashes() {
+    pub fn it_can_generate_valid_output_and_verify_it() {
         let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
 	    // let msk = keypair.secret.0; // can destroy this
 	    let double_public: DoublePublicKey<TinyBLS377> =  DoublePublicKey(
@@ -207,44 +248,92 @@ mod tests {
             double_public,
         );
 
+        // precompute a root here
+        // this is the expected root when we attempt to call verify
+        let store = MemStore::default();
+        let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
+    
+        leaves.clone().into_iter().for_each(|leaf_data| {
+            mmr.push(leaf_data.1.clone()).unwrap();
+        });
+    
+        // prepare merkle proof
+        let expected_root = mmr.get_root().expect("The MMR root should be calculable");
+        let aux_data = vec![1,2,3];
+
         let later = 1;
         // generate execution parameters
-        if let Ok(result) = execute::<TinyBLS377>(
-            seed,
+        if let Ok(payload) = execute::<TinyBLS377>(
+            seed.clone(),
             later,
-            vec![1,2,3], // aux data (call data in practice)
+            aux_data.clone(),
             leaves,
         ) {
-            let root: Leaf = result.0;
-            let hash: Vec<u8> = result.1;
-            let original_proof: MerkleProof<Leaf, MergeLeaves> = result.2;
-            let target_leaf: Leaf = result.3;
-            let pos: u64 = result.4;
-            
+            // we will recalculate the otp code here
+            // in practice, the verify function would get the OTP code by using timelock decryption
+            // where the ciphertext is provided in the execution payload
+            let botp = build_generator(&seed.clone());
+            let otp_code = botp.generate(later);
 
-            // experiment w/ serialization
-            let proof_items: Vec<Vec<u8>> = original_proof.proof_items().iter()
-                .map(|leaf| leaf.0.to_vec().clone())
-                .collect::<Vec<_>>();
-            // convert to leaves
-            let leaves: Vec<Leaf> = proof_items.clone().into_iter().map(|p| Leaf(p)).collect::<Vec<_>>();
-            assert_eq!(leaves, original_proof.proof_items().to_vec());
+            assert!(verify(expected_root, otp_code, aux_data, payload));
+        } else {
+            panic!("The test should pass");
+        }
+    }
 
-            let proof = MerkleProof::<Leaf, MergeLeaves>::new(schedule.clone().len() as u64, leaves);
-            assert_eq!(proof.proof_items(), original_proof.proof_items());
-            // let root = Leaf::from(proxy_details.root);
-            let target = vec![(pos, target_leaf.clone())];
-            let new_root = proof.calculate_root(target.clone()).unwrap();
+    #[test]
+    pub fn it_fails_on_verify_bad_aux_data() {
+        let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
+	    // let msk = keypair.secret.0; // can destroy this
+	    let double_public: DoublePublicKey<TinyBLS377> =  DoublePublicKey(
+		    keypair.into_public_key_in_signature_group().0,
+		    keypair.public.0,
+	    );
 
-            match proof.verify(new_root, target.clone()) {
-                Ok(validity) => {
-                    assert!(validity);
-                },
-                Err(e) => {
-                    panic!("The test failed with error: {:?}", e);
-                }
-            }
-            // then we verify the hash
+        let double_public_again: DoublePublicKey<TinyBLS377> =  DoublePublicKey(
+		    keypair.into_public_key_in_signature_group().0,
+		    keypair.public.0,
+	    );
+
+        let ephem_msk = [1;32];
+        let seed = vec![1,2,3];
+        let schedule = vec![1,2,3];
+
+        let leaves = create::<TinyBLS377>(
+            seed.clone(),
+            schedule.clone(),
+            ephem_msk,
+            double_public,
+        );
+
+        // precompute a root here
+        // this is the expected root when we attempt to call verify
+        let store = MemStore::default();
+        let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
+    
+        leaves.clone().into_iter().for_each(|leaf_data| {
+            mmr.push(leaf_data.1.clone()).unwrap();
+        });
+    
+        // prepare merkle proof
+        let expected_root = mmr.get_root().expect("The MMR root should be calculable");
+        let aux_data = vec![1,2,3];
+
+        let later = 1;
+        // generate execution parameters
+        if let Ok(payload) = execute::<TinyBLS377>(
+            seed.clone(),
+            later,
+            aux_data.clone(),
+            leaves,
+        ) {
+            // we will recalculate the otp code here
+            // in practice, the verify function would get the OTP code by using timelock decryption
+            // where the ciphertext is provided in the execution payload
+            let botp = build_generator(&seed.clone());
+            let otp_code = botp.generate(later);
+            let bad_aux_data = vec![2,3,4,5,4,3];
+            assert!(!verify(expected_root, otp_code, bad_aux_data, payload));
         } else {
             panic!("The test should pass");
         }

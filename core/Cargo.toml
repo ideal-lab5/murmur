@@ -21,8 +21,6 @@ etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch
 rand_chacha = "0.3.1"
 ckb-merkle-mountain-range = "0.5.2"
 sha3 = "0.10.8"
-# serde_cbor = "0.11.2"
-# serde_json = "1.0.108"
 serde = { version = "1.0.188", features = ["alloc", "derive"], default-features = false}
 beefy = { package = "sp-consensus-beefy-etf", git = "https://github.com/ideal-lab5/etf.git", branch = "tony/dev", features = ["bls-experimental"] } 
 ark-bls12-377 = { version = "0.4.0", default-features = false }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use ckb_merkle_mountain_range::{Merge, Result as MMRResult};
+use ckb_merkle_mountain_range::{Merge, Result as MMRResult, MerkleProof};
 use codec::{Decode, Encode};
 use sha3::Digest;
 use alloc::vec::Vec;
@@ -50,4 +50,22 @@ impl Merge for MergeLeaves {
         let hash = hasher.finalize();
         Ok(Leaf(hash.to_vec().into()))
     }
+}
+
+/// an execution payload to represent knowledge of a future otp code
+#[derive(Debug)]
+pub struct ExecutionPayload {
+    /// the root of the mmr
+    pub root: Leaf,
+    /// the merkle proof for the target leaf
+    pub proof: MerkleProof<Leaf, MergeLeaves>,
+    /// the target leaf (contains ciphertext)
+    pub target: Leaf,
+    /// the position of the target leaf in the mmr
+    pub pos: u64,
+    /// hash(OTP || CALL_DATA)
+    pub hash: Vec<u8>,
+    /// the secret key that can be used to decrypt the target
+    /// can be empty
+    pub sk: Vec<u8>,
 }

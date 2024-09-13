@@ -1,12 +1,6 @@
 # Murmur
 
-Murmur is a framework for building web3 applications. It enables on-chain, time-based event clocks. 
-
-An OTP Wallet Client
-
-This is an experimental keyless crytpo wallet client for OTP proxies on the ETF Network.
-
-This client allows users to authenticate with a pure proxy by using an OTP code. It uses timelock encryption and time-based OTP generation 
+Murmur is an air-gapped keyless crypto wallet protocol that runs on the Ideal Network. It is based on the [Hours of Horus]() protocol, where it enables keyless crypto wallets that require knowledge of future OTP codes rather than signatures in order to execute calls.
 
 ## Setup
 

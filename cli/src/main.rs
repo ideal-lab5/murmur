@@ -56,7 +56,7 @@ use std::io;
 //     DefaultTerminal,
 // };
 
-use node_template_runtime::{self, OtpCall, RuntimeCall, BalancesCall};
+use node_template_runtime::{self, MurmurCall, RuntimeCall, BalancesCall};
 
 use subxt::ext::codec::Encode;
 use beefy::{known_payloads, Payload, Commitment, VersionedFinalityProof};
@@ -281,18 +281,18 @@ async fn handle_execute<E: EngineBLS>(
     let leaves: Vec<(BlockNumber, Leaf)> = load_leaves();
 
     let call_data = call.encode();
-    let params = murmur::execute::<E>(
+    let payload = murmur::execute::<E>(
         seed,
         when,
         call_data,
         leaves.clone(),
     ).map_err(|e| println!("Murmur execution failed due to {:?}", e)).unwrap();
 
-    let root: Leaf = params.0;
-    let hash: Vec<u8> = params.1;
-    let proof: MerkleProof<Leaf, MergeLeaves> = params.2;
-    let target_leaf: Leaf = params.3;
-    let pos: u64 = params.4;
+    let root: Leaf = payload.root;
+    let hash: Vec<u8> = payload.hash;
+    let proof: MerkleProof<Leaf, MergeLeaves> = payload.proof;
+    let target_leaf: Leaf = payload.target;
+    let pos: u64 = payload.pos;
 
     let proof_items: Vec<Vec<u8>> = proof.proof_items().iter()
         .map(|leaf| leaf.0.to_vec().clone())
@@ -301,34 +301,22 @@ async fn handle_execute<E: EngineBLS>(
     let bounded = <BoundedVec<_, ConstU32<32>>>::truncate_from(name);
 
     
-    let proxy_call = RuntimeCall::Otp(OtpCall::proxy {
+    let proxy_call = RuntimeCall::Murmur(MurmurCall::proxy {
         name: bounded,
         position: pos,
-        size: leaves.len() as u64,
-        ciphertext_bytes: target_leaf.0,
+        target_leaf: target_leaf.0,
         proof: proof_items,
         call: Box::new(call),
         when,
         hash,
     });
 
-    // let proxy_call = etf::tx().otp().proxy(
-    //     bounded,
-    //     pos,
-    //     leaves.len() as u64,
-    //     target_leaf.0,
-    //     hash,
-    //     proof_items,
-    //     Box::new(call),
-    //     when,
-    // );
-
     let proxy_call_bytes: &[u8] = &proxy_call.encode();
-
     // then construct a scheduled transaction for "when"
     // 1. tlock
+    let identity = murmur::build_identity(when);
     let timelocked_proxy_call = murmur::timelock_encrypt::<E>(
-        when,
+        identity,
         pk.1,
         ephemeral_msk,
         proxy_call_bytes,
