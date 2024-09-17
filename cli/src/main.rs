@@ -67,6 +67,7 @@ use murmur_core::{
         BlockNumber,
         Leaf,
         MergeLeaves,
+        IdentityBuilder,
     },
     murmur,
 };
@@ -98,9 +99,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// create a new OTP wallet
+    /// create a new murmur wallet
     New(WalletCreationDetails),
-    /// dispatch (proxy) a call to an OTP wallet
+    /// dispatch (proxy) a call to a murmur wallet in the future
+    ScheduleExecute(WalletExecuteDetails),
+    /// dispatch (proxy) a call to a murmur wallet
     Execute(WalletExecuteDetails),
 }
 
@@ -110,8 +113,10 @@ struct WalletCreationDetails {
     name: String,
     #[arg(long)]
     seed: String,
-    #[clap(short, long, value_delimiter = ' ', num_args = 1..)]
-    schedule: Vec<BlockNumber>,
+    #[clap(long)]
+    interval: u32,
+    #[clap(long)]
+    max: u32,
 }
 
 #[derive(Parser)]
@@ -157,6 +162,20 @@ pub enum CLIError {
 //     }
 // }
 
+#[derive(Debug)]
+pub struct BasicIdBuilder;
+impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
+    fn build_identity(when: BlockNumber) -> Identity {
+        let payload = Payload::from_single_entry(known_payloads::ETF_SIGNATURE, Vec::new());
+        let commitment = Commitment {
+            payload, 
+            block_number: when, 
+            validator_set_id: 0, // TODO: how to ensure correct validator set ID is used? could just always set to 1 for now, else set input param.
+        };
+        Identity::new(&commitment.encode())
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -184,6 +203,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let current_block_number = current_block.header().number;
 
     println!("🧊 Current block number: #{:?}", current_block_number);
+
+    // why do I have two clients??
     let etf = OnlineClient::<SubstrateConfig>::new().await?;
 
     // let mut mmr_store_file = File::create("mmr_store").unwrap();
@@ -196,10 +217,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &cli.commands {
         Commands::New(args) => {        
             println!("🏭 Murmur: Generating Merkle mountain range");
+            let mut schedule: Vec<BlockNumber> = Vec::new();
+            for i in 0..args.max {
+                // wallet is 'active' in 2 blocks 
+                let next_block = current_block_number.clone() + 2 + i * args.interval.clone();
+                schedule.push(next_block);
+            }
             // create leaves
-            let leaves = murmur::create::<TinyBLS377>(
+            let leaves = murmur::create::<TinyBLS377, BasicIdBuilder>(
                 args.seed.clone().into(),
-                args.schedule.clone(),
+                schedule.clone(),
                 ephem_msk,
                 round_pubkey,
             );
@@ -219,9 +246,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // prepare and send tx from 'alice' account (for now)
             // should be configurable
             let create_anon_tx = etf::tx()
-                .otp()
+                .murmur()
                 .create(
-                    root.0.into(), 
+                    root.0.into(),
+                    leaves.len() as u64,
                     etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(name));
             // TODO: make the origin configurable
             let from = dev::alice();
@@ -232,7 +260,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("✅ MMR proxy account creation successful!");
             
         },
-        Commands::Execute(args) => {
+        Commands::ScheduleExecute(args) => {
             
             // build balance transfer
             let bob = AccountKeyring::Bob.to_account_id().into();
@@ -246,16 +274,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     dest: bob,
                     value: v,
             });
-            handle_execute::<TinyBLS377>(
+            let call = prepare_execution_payload_for_proxy::<TinyBLS377>(
                 etf.clone(),
                 args.name.clone().as_bytes().to_vec(),
                 args.seed.clone().as_bytes().to_vec(),
                 args.when.clone(),
-                ephem_msk,
-                round_pubkey,
                 balance_transfer_call,
             ).await;
-        }, 
+            // sign and send the tx (with the alice wallet for now)
+            dispatch_sealed_tx::<TinyBLS377, BasicIdBuilder>(
+                etf,
+                args.when, 
+                ephem_msk,
+                round_pubkey,
+                call,
+            ).await;
+        },
+        Commands::Execute(args) => {
+            // build balance transfer
+            let bob =  dev::alice().public_key();
+            // get the value argument
+            let v: u128 = args.amount
+                .split_whitespace()
+                .map(|r| r.replace('_', "").parse().unwrap())
+                .collect::<Vec<_>>()[0];
+            // TODO: cleanup type defs
+            let balance_transfer_call = etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
+                etf::balances::Call::transfer_allow_death {
+                    dest: subxt::utils::MultiAddress::<_, u32>::from(bob),
+                    value: v,
+            }
+            );
+
+            // let balance_transfer_call = etf::tx().balances().transfer_allow_death(
+            //     bob,
+            //     v,
+            // );
+
+            // instead of the 'when' argument, we need the next etf-pfg block number
+            // let latest_pfg_block_query = subxt::dynamic::storage("RandomnessBeacon", "Height", ());
+            // let latest_pfg_block_result = client
+            //     .storage()
+            //     .at_latest()
+            //     .await?
+            //     .fetch(&latest_pfg_block_query)
+            //     .await?;
+            // let latest_pfg_block = latest_pfg_block_result.unwrap().as_type::<u32>()?;
+            // println!("Executing with latest pfg block {:?}", (latest_pfg_block.clone() + 1).clone());
+            execute::<TinyBLS377>(
+                etf.clone(),
+                args.name.clone().as_bytes().to_vec(),
+                args.seed.clone().as_bytes().to_vec(),
+                current_block_number,
+                balance_transfer_call,
+            ).await;
+                // sign and send the tx (with the alice wallet for now)
+            //   dispatch_tx::<TinyBLS377, BasicIdBuilder>(
+            //       etf, call,
+            //   ).await;
+        },
         _ => panic!("Hey, don't do that!"),
     }
     println!("Elapsed time: {:.2?}", before.elapsed());
@@ -263,24 +340,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn handle_create() {
-
+    // todo
 }
 
-async fn handle_execute<E: EngineBLS>(
+/// prepare the proxy call for a scheduled transaction
+async fn prepare_execution_payload_for_proxy<E: EngineBLS>(
     etf: OnlineClient<SubstrateConfig>,
     name: Vec<u8>,
     seed: Vec<u8>,
     when: BlockNumber,
-    ephemeral_msk: [u8;32],
-    pk: DoublePublicKey<E>,
     call: RuntimeCall,
-) -> Option<()> {
-    println!("Murmur: Execute Wallet Balance Transfer");
-    let mut rng = ChaCha20Rng::seed_from_u64(1);
-
+) -> RuntimeCall {
     let leaves: Vec<(BlockNumber, Leaf)> = load_leaves();
 
     let call_data = call.encode();
+    // prepare the proof required to used the mmr wallet at the specific block height
     let payload = murmur::execute::<E>(
         seed,
         when,
@@ -288,7 +362,7 @@ async fn handle_execute<E: EngineBLS>(
         leaves.clone(),
     ).map_err(|e| println!("Murmur execution failed due to {:?}", e)).unwrap();
 
-    let root: Leaf = payload.root;
+    // let root: Leaf = payload.root;
     let hash: Vec<u8> = payload.hash;
     let proof: MerkleProof<Leaf, MergeLeaves> = payload.proof;
     let target_leaf: Leaf = payload.target;
@@ -299,7 +373,6 @@ async fn handle_execute<E: EngineBLS>(
         .collect::<Vec<_>>();
 
     let bounded = <BoundedVec<_, ConstU32<32>>>::truncate_from(name);
-
     
     let proxy_call = RuntimeCall::Murmur(MurmurCall::proxy {
         name: bounded,
@@ -309,12 +382,81 @@ async fn handle_execute<E: EngineBLS>(
         call: Box::new(call),
         when,
         hash,
+        signature: None,
     });
 
+    proxy_call
+}
+
+/// prepare the call for immediate execution
+async fn execute<E: EngineBLS>(
+    etf: OnlineClient<SubstrateConfig>,
+    name: Vec<u8>,
+    seed: Vec<u8>,
+    when: BlockNumber,
+    call: etf::runtime_types::node_template_runtime::RuntimeCall,
+) {
+    let leaves: Vec<(BlockNumber, Leaf)> = load_leaves();
+
+    let call_data = call.encode();
+    // prepare the proof required to used the mmr wallet at the specific block height
+    let payload = murmur::execute::<E>(
+        seed,
+        when,
+        call_data,
+        leaves.clone(),
+    ).map_err(|e| println!("Murmur execution failed due to {:?}", e)).unwrap();
+
+    // let root: Leaf = payload.root;
+    let hash: Vec<u8> = payload.hash;
+    let proof: MerkleProof<Leaf, MergeLeaves> = payload.proof;
+    let target_leaf: Leaf = payload.target;
+    let pos: u64 = payload.pos;
+
+    let proof_items: Vec<Vec<u8>> = proof.proof_items().iter()
+        .map(|leaf| leaf.0.to_vec().clone())
+        .collect::<Vec<_>>();
+
+    let bounded = etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(name);
+   
+    let tx = etf::tx().murmur().proxy(
+        bounded,
+        pos,
+        target_leaf.0,
+        hash,
+        proof_items,
+        call,
+        when,
+        None,
+    );
+    etf.tx()
+        .sign_and_submit_then_watch_default(&tx, &dev::alice())
+        .await;
+}
+
+// /// dispatch the transaction for the next block 
+// async fn dispatch_tx<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
+//     etf: OnlineClient<SubstrateConfig>,
+//     proxy_call: RuntimeCall,
+// ) {
+//     let events = etf
+//         .tx()
+//         .sign_and_submit_then_watch_default(&subxt::tx::Payload(proxy_call), &dev::alice())
+//         .await;
+// }
+
+/// dispatch a shielded (timelocked) transaction for a future block
+async fn dispatch_sealed_tx<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
+    etf: OnlineClient<SubstrateConfig>,
+    when: BlockNumber,
+    ephemeral_msk: [u8;32],
+    pk: DoublePublicKey<E>,
+    proxy_call: RuntimeCall,
+) {
     let proxy_call_bytes: &[u8] = &proxy_call.encode();
     // then construct a scheduled transaction for "when"
     // 1. tlock
-    let identity = murmur::build_identity(when);
+    let identity = I::build_identity(when);
     let timelocked_proxy_call = murmur::timelock_encrypt::<E>(
         identity,
         pk.1,
@@ -332,8 +474,6 @@ async fn handle_execute<E: EngineBLS>(
         .tx()
         .sign_and_submit_then_watch_default(&sealed_tx, &dev::alice())
         .await;
-    None
-
 }
 
 /// read an MMR from a file

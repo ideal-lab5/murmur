@@ -1,6 +1,6 @@
 # Murmur
 
-Murmur is an air-gapped keyless crypto wallet protocol that runs on the Ideal Network. It is based on the [Hours of Horus]() protocol, where it enables keyless crypto wallets that require knowledge of future OTP codes rather than signatures in order to execute calls.
+Murmur is an air-gapped keyless crypto wallet protocol that runs on the Ideal Network. It is based on the [Hours of Horus](https://eprint.iacr.org/2021/715) protocol, where it enables keyless crypto wallets that require knowledge of future OTP codes rather than signatures in order to execute calls.
 
 ## Setup
 
@@ -12,12 +12,6 @@ cargo build
 
 ```
 cargo test
-```
-
-## Usage
-
-``` shell
-./target/debug/murmur-cli new --name test --seed my_secret_key --schedule 100 110 120
 ```
 
 ## Generating metadata for the chain

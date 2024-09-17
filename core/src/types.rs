@@ -15,6 +15,7 @@
  */
 
 use ckb_merkle_mountain_range::{Merge, Result as MMRResult, MerkleProof};
+pub use etf_crypto_primitives::ibe::fullident::Identity;
 use codec::{Decode, Encode};
 use sha3::Digest;
 use alloc::vec::Vec;
@@ -66,6 +67,10 @@ pub struct ExecutionPayload {
     /// hash(OTP || CALL_DATA)
     pub hash: Vec<u8>,
     /// the secret key that can be used to decrypt the target
-    /// can be empty
+    /// can be empty, only needed in forced, early-decryption scenarios
     pub sk: Vec<u8>,
+}
+
+pub trait IdentityBuilder<BlockNumber> {
+    fn build_identity(at: BlockNumber) -> Identity;
 }

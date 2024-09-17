@@ -9,7 +9,7 @@ edition = "2021"
 subxt = "0.35.2"
 subxt-signer = "0.35.2"
 tokio = { version = "1.35", features = ["macros", "time", "rt-multi-thread"] }
-murmur-core = { package = "murmur-core", path = "../core/" }
+murmur-core = { package = "murmur-core", path = "../core/", features = ["client"] }
 etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "tony/dev" } 
 # etf-crypto-primitives = { path = "../etf-sdk/etf-crypto-primitives" }
 clap = { version = "4.1.1", features = ["derive"] }
@@ -23,8 +23,8 @@ serde_json = "1.0.108"
 indicatif = "0.17.8"
 sp-keyring = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
 frame-support = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
-# node-template-runtime = { path = "../../etf/runtime" }
-node-template-runtime = { git = "https://github.com/ideal-lab5/etf.git", branch = "tony/dev" }
+node-template-runtime = { path = "../../etf/runtime" }
+# node-template-runtime = { git = "https://github.com/ideal-lab5/etf.git", branch = "tony/dev" }
 codec = { package = "parity-scale-codec", version = "3.6.12", features = [
 	"derive",
 ] }

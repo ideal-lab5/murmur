@@ -18,7 +18,13 @@
 //!
 
 use alloc::{string::String, vec, vec::Vec};
+
+#[cfg(feature = "client")]
 use crate::otp::BOTPGenerator;
+
+#[cfg(feature = "client")]
+use rand_core::OsRng;
+
 use crate::types::*;
 use etf_crypto_primitives::{
     ibe::fullident::Identity,
@@ -34,37 +40,32 @@ use ckb_merkle_mountain_range::{
 };
 use ark_serialize::CanonicalSerialize;
 use codec::Encode;
-use rand_core::OsRng;
 use sha3::Digest;
-use beefy::{known_payloads, Payload, Commitment, VersionedFinalityProof};
 
 #[derive(Debug)]
 pub enum Error {
     ExecuteError
 }
 
-// TODO: create an 'identity builder' trait and inject into the create function
-// then remove the dependency on beefy here
-// and implement an identity builder in the cli component
-
 /// creates the leaves needed to generate an MMR
 /// This function generates otp codes for the given block schedule
 /// then it encrypts the resulting codes and constructs leaves 
 /// the leaves can be used to generate an MMR
 ///
-pub fn create<E: EngineBLS>(
+#[cfg(feature = "client")]
+pub fn create<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
     seed: Vec<u8>,
     block_schedule: Vec<BlockNumber>,
     ephemeral_msk: [u8;32],
     pk: DoublePublicKey<E>,
-) -> Vec<(BlockNumber, Leaf)>  {
+) -> Vec<(BlockNumber, Leaf)> {
     let totp = build_generator(&seed.clone());
 
     let mut leaves = Vec::new();
 
     for i in &block_schedule {
         let otp_code = totp.generate(*i);
-        let identity = build_identity(*i);
+        let identity = I::build_identity(*i);
         let ct_bytes = timelock_encrypt::<E>(
             identity,
             pk.1,
@@ -80,6 +81,7 @@ pub fn create<E: EngineBLS>(
 
 /// computes parameters needed to execute a transaction at the specified block number
 /// outputs a payload containing: (ciphertext, hash, merkle proof, position/index)
+#[cfg(feature = "client")]
 pub fn execute<E: EngineBLS>(
     seed: Vec<u8>,
     when: BlockNumber,
@@ -132,7 +134,7 @@ pub fn execute<E: EngineBLS>(
 /// e.g. would be called by the pallet/runtime
 pub fn verify(
     root: Leaf, 
-    otp: String, 
+    otp: Vec<u8>, 
     aux_data: Vec<u8>, 
     payload: ExecutionPayload
 ) -> bool {
@@ -147,7 +149,7 @@ pub fn verify(
     if validity {
         // verify the hash
         let mut hasher = sha3::Sha3_256::default();
-        hasher.update(otp.as_bytes().to_vec());
+        hasher.update(otp);
         hasher.update(aux_data);
         let hash = hasher.finalize();
 
@@ -158,6 +160,7 @@ pub fn verify(
     validity
 }
 
+#[cfg(feature = "client")]
 /// timelock encryption function
 pub fn timelock_encrypt<E: EngineBLS>(
     identity: Identity,
@@ -177,21 +180,8 @@ pub fn timelock_encrypt<E: EngineBLS>(
     ct_bytes
 }
 
-
-/// build an identity based on the block number
-/// in the future we can consider abstracting this functionality to work with identities constructed in different ways
-/// e.g. if we want to support multiple beacons
-pub fn build_identity(when: BlockNumber) -> Identity {
-    let payload = Payload::from_single_entry(known_payloads::ETF_SIGNATURE, Vec::new());
-    let commitment = Commitment {
-        payload, 
-        block_number: when, 
-        validator_set_id: 0, // TODO: how to ensure correct validator set ID is used? could just always set to 1 for now, else set input param.
-    };
-    Identity::new(&commitment.encode())
-}
-
 /// build a block-otp generator from the seed
+#[cfg(feature = "client")]
 fn build_generator(seed: &[u8]) -> BOTPGenerator {
     let mut hasher = sha3::Sha3_256::default();
     hasher.update(seed);
@@ -204,6 +194,14 @@ mod tests {
     use super::*;
     use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, TinyBLS377};
 
+    pub struct DummyIdBuilder;
+    impl IdentityBuilder<BlockNumber> for DummyIdBuilder {
+        fn build_identity(at: BlockNumber) -> Identity {
+            Identity::new(&[at as u8])
+        }
+    }
+
+    #[cfg(feature = "client")]
     #[test]
     pub fn it_can_generate_leaves() {
         let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
@@ -217,7 +215,7 @@ mod tests {
         let seed = vec![1,2,3];
         let schedule = vec![1,2,3];
 
-        let leaves = create::<TinyBLS377>(
+        let leaves = create::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),
             schedule,
             ephem_msk,
@@ -227,6 +225,7 @@ mod tests {
         assert!(leaves.len() == 3);
     }
 
+    #[cfg(feature = "client")]
     #[test]
     pub fn it_can_generate_valid_output_and_verify_it() {
         let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
@@ -245,7 +244,7 @@ mod tests {
         let seed = vec![1,2,3];
         let schedule = vec![1,2,3];
 
-        let leaves = create::<TinyBLS377>(
+        let leaves = create::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),
             schedule.clone(),
             ephem_msk,
@@ -279,12 +278,13 @@ mod tests {
             let botp = build_generator(&seed.clone());
             let otp_code = botp.generate(later);
 
-            assert!(verify(expected_root, otp_code, aux_data, payload));
+            assert!(verify(expected_root, otp_code.as_bytes().to_vec(), aux_data, payload));
         } else {
             panic!("The test should pass");
         }
     }
 
+    #[cfg(feature = "client")]
     #[test]
     pub fn it_fails_on_verify_bad_aux_data() {
         let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
@@ -303,7 +303,7 @@ mod tests {
         let seed = vec![1,2,3];
         let schedule = vec![1,2,3];
 
-        let leaves = create::<TinyBLS377>(
+        let leaves = create::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),
             schedule.clone(),
             ephem_msk,
@@ -325,7 +325,7 @@ mod tests {
 
         let later = 1;
         // generate execution parameters
-        if let Ok(payload) = execute::<TinyBLS377>(
+        if let Ok(payload) =  execute::<TinyBLS377>(
             seed.clone(),
             later,
             aux_data.clone(),
@@ -337,7 +337,7 @@ mod tests {
             let botp = build_generator(&seed.clone());
             let otp_code = botp.generate(later);
             let bad_aux_data = vec![2,3,4,5,4,3];
-            assert!(!verify(expected_root, otp_code, bad_aux_data, payload));
+            assert!(!verify(expected_root, otp_code.as_bytes().to_vec(), bad_aux_data, payload));
         } else {
             panic!("The test should pass");
         }
