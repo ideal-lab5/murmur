@@ -125,7 +125,6 @@ pub fn execute<E: EngineBLS>(
         target: target_leaf,
         pos: target_pos,
         hash,
-        sk: Vec::new(),
     };
     Ok(payload)
 }
@@ -270,7 +269,7 @@ mod tests {
             seed.clone(),
             later,
             aux_data.clone(),
-            leaves,
+            leaves.clone(),
         ) {
             // we will recalculate the otp code here
             // in practice, the verify function would get the OTP code by using timelock decryption
@@ -278,6 +277,24 @@ mod tests {
             let botp = build_generator(&seed.clone());
             let otp_code = botp.generate(later);
 
+            // lets check if we can serialize/deserialize the proof and still verify it
+            let proof_items: Vec<Vec<u8>> = payload.proof.proof_items().iter()
+                .map(|leaf| leaf.0.to_vec().clone())
+                .collect::<Vec<_>>();
+            let proof_leaves: Vec<Leaf> = proof_items.clone().into_iter().map(|p| Leaf(p)).collect::<Vec<_>>();
+			// rebuild the proofs
+			let merkle_proof = MerkleProof::<Leaf, MergeLeaves>::new(leaves.len() as u64, proof_leaves);
+
+            let execution_payload = ExecutionPayload {
+                root: expected_root.clone(),
+                proof: merkle_proof,
+                target: payload.target.clone(),
+                pos: payload.pos.clone(),
+                hash: payload.hash.clone(),
+            };
+
+            let validity = verify(expected_root.clone(), otp_code.as_bytes().to_vec(), aux_data.clone(), execution_payload);
+            assert!(validity);
             assert!(verify(expected_root, otp_code.as_bytes().to_vec(), aux_data, payload));
         } else {
             panic!("The test should pass");

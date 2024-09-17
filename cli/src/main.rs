@@ -114,9 +114,7 @@ struct WalletCreationDetails {
     #[arg(long)]
     seed: String,
     #[clap(long)]
-    interval: u32,
-    #[clap(long)]
-    max: u32,
+    valid_for: u8,
 }
 
 #[derive(Parser)]
@@ -212,15 +210,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
 
     // TODO: HKDF? just hash the seed?
-    let ephem_msk = [1;32];
+    let ephem_msk = [1;32]; 
 
     match &cli.commands {
         Commands::New(args) => {        
             println!("🏭 Murmur: Generating Merkle mountain range");
             let mut schedule: Vec<BlockNumber> = Vec::new();
-            for i in 0..args.max {
+            for i in 2..args.valid_for + 2 {
                 // wallet is 'active' in 2 blocks 
-                let next_block = current_block_number.clone() + 2 + i * args.interval.clone();
+                let next_block = current_block_number.clone() + i as u32;
                 schedule.push(next_block);
             }
             // create leaves
@@ -261,7 +259,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
         },
         Commands::ScheduleExecute(args) => {
-            
             // build balance transfer
             let bob = AccountKeyring::Bob.to_account_id().into();
             // get the value argument
@@ -305,22 +302,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     value: v,
             }
             );
-
-            // let balance_transfer_call = etf::tx().balances().transfer_allow_death(
-            //     bob,
-            //     v,
-            // );
-
-            // instead of the 'when' argument, we need the next etf-pfg block number
-            // let latest_pfg_block_query = subxt::dynamic::storage("RandomnessBeacon", "Height", ());
-            // let latest_pfg_block_result = client
-            //     .storage()
-            //     .at_latest()
-            //     .await?
-            //     .fetch(&latest_pfg_block_query)
-            //     .await?;
-            // let latest_pfg_block = latest_pfg_block_result.unwrap().as_type::<u32>()?;
-            // println!("Executing with latest pfg block {:?}", (latest_pfg_block.clone() + 1).clone());
             execute::<TinyBLS377>(
                 etf.clone(),
                 args.name.clone().as_bytes().to_vec(),
@@ -328,10 +309,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 current_block_number,
                 balance_transfer_call,
             ).await;
-                // sign and send the tx (with the alice wallet for now)
-            //   dispatch_tx::<TinyBLS377, BasicIdBuilder>(
-            //       etf, call,
-            //   ).await;
         },
         _ => panic!("Hey, don't do that!"),
     }
@@ -374,18 +351,14 @@ async fn prepare_execution_payload_for_proxy<E: EngineBLS>(
 
     let bounded = <BoundedVec<_, ConstU32<32>>>::truncate_from(name);
     
-    let proxy_call = RuntimeCall::Murmur(MurmurCall::proxy {
+    RuntimeCall::Murmur(MurmurCall::proxy {
         name: bounded,
         position: pos,
         target_leaf: target_leaf.0,
         proof: proof_items,
         call: Box::new(call),
-        when,
         hash,
-        signature: None,
-    });
-
-    proxy_call
+    })
 }
 
 /// prepare the call for immediate execution
@@ -426,24 +399,11 @@ async fn execute<E: EngineBLS>(
         hash,
         proof_items,
         call,
-        when,
-        None,
     );
     etf.tx()
         .sign_and_submit_then_watch_default(&tx, &dev::alice())
         .await;
 }
-
-// /// dispatch the transaction for the next block 
-// async fn dispatch_tx<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
-//     etf: OnlineClient<SubstrateConfig>,
-//     proxy_call: RuntimeCall,
-// ) {
-//     let events = etf
-//         .tx()
-//         .sign_and_submit_then_watch_default(&subxt::tx::Payload(proxy_call), &dev::alice())
-//         .await;
-// }
 
 /// dispatch a shielded (timelocked) transaction for a future block
 async fn dispatch_sealed_tx<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
@@ -469,7 +429,6 @@ async fn dispatch_sealed_tx<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
         .scheduler()
         .schedule_sealed(when, 127, bounded_ciphertext);
     // 3. submit tx
-    
     let events = etf
         .tx()
         .sign_and_submit_then_watch_default(&sealed_tx, &dev::alice())
@@ -495,7 +454,5 @@ fn write_leaves(leaves: &[(BlockNumber, Leaf)]) {
 
 #[cfg(test)]
 mod tests {
-    // pub fn test_can_read_write_leaves() {
-        
-    // }
+    // pub fn test_can_read_write_leaves() { }
 }
