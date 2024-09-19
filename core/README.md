@@ -2,8 +2,15 @@
 
 The core implementation of the murmur protocol. This library enables each step of the Murmur protocol, including implementations of the following:
 
-- `create -> (root, mmr_leaves_to_bn = {(1, Leaf(0x0123...)), (3, Leaf(0x12301...)), ...})`
-- `execute -> `
+### Functions
+
+#### Create
+$\{(b_i, ct_i)\}_{i \in [n]} \leftarrow Murmur.Create(seed, \{b_0, ..., b_n\}) $
+
+#### PrepareExecute
+$h_b \leftarrow PrepareExecute(seed, AUX, b)$
+
+#### Verify
 - `verify -> true/false`
 
 ## Build

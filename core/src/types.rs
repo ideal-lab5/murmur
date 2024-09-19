@@ -23,6 +23,8 @@ use alloc::vec::Vec;
 /// the type to represent a block number
 pub type BlockNumber = u32;
 
+pub type Ciphertext = Vec<u8>;
+
 /// A leaf in the MMR
 /// the payload is an opaque, any-length vec
 #[derive(
