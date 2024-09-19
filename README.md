@@ -14,3 +14,9 @@ cargo build
 cargo test
 ```
 
+## TODOs
+
+- [ ] create and add latex doc
+- [ ] add zeroize for safety
+- [ ] look into using ratatui
+- [ ] performance and storage optimizations

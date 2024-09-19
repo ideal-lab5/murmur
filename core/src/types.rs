@@ -55,21 +55,7 @@ impl Merge for MergeLeaves {
     }
 }
 
-/// an execution payload to represent knowledge of a future otp code
-#[derive(Debug)]
-pub struct ExecutionPayload {
-    /// the root of the mmr
-    pub root: Leaf,
-    /// the merkle proof for the target leaf
-    pub proof: MerkleProof<Leaf, MergeLeaves>,
-    /// the target leaf (contains ciphertext)
-    pub target: Leaf,
-    /// the position of the target leaf in the mmr
-    pub pos: u64,
-    /// hash(OTP || CALL_DATA)
-    pub hash: Vec<u8>,
-}
-
+/// something that builds unique identities (e.g. using crypto hash function) for any block number
 pub trait IdentityBuilder<BlockNumber> {
     fn build_identity(at: BlockNumber) -> Identity;
 }

@@ -16,9 +16,6 @@
 #![no_std]
 //! the murmur core library
 extern crate alloc;
-// extern crate allocation;
-// extern crate core;
-// extern crate
 
 #[cfg(feature = "client")]
 mod otp;
