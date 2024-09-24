@@ -1,11 +1,11 @@
 [package]
-name = "murmur-core"
+name = "murmur-test-utils"
 version = "0.1.0"
 edition = "2021"
 authors.workspace = true
 
 [lib]
-name = "murmur"
+name = "murmur_test_utils"
 path = "src/lib.rs"
 
 [lints]
@@ -20,7 +20,7 @@ getrandom = { version = "0.2", features = ["js"], default-features = false, opti
 rand_core = { version = "0.6.4", features = ["getrandom"], default-features = false, optional = true }
 
 codec = { package = "parity-scale-codec", version = "3.6.12", features = ["derive"], default-features = false }
-etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "dev", default-features = false} 
+etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "tony/dev", default-features = false} 
 ckb-merkle-mountain-range = { version = "0.5.2", default-features = false }
 sha3 = { version = "0.10.8", default-features = false }
 serde = { version = "1.0.188", features = ["alloc", "derive"], default-features = false}
@@ -31,6 +31,7 @@ ark-serialize = { version = "0.4.0", default-features = false }
 w3f-bls = { version = "0.1.3", default-features = false }
 hex = { version = "0.4.3", default-features = false }
 array-bytes = { version = "6.1", default-features = false }
+murmur-core = { path = "../core", default-features = false, features = []}
 # add zeroize 
 # 1.8.1
 
@@ -48,6 +49,7 @@ std = [
     "sha3/std",
     "ckb-merkle-mountain-range/std",
     "hex/std",
+    "murmur-core/std",
 ]
 no_std = []
 client = [

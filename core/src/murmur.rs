@@ -17,7 +17,7 @@
 //! The murmur protocol implementation
 //!
 use alloc::{
-    string::String, vec, 
+    vec, 
     vec::Vec,
     collections::BTreeMap,
 };
@@ -27,6 +27,9 @@ use crate::otp::BOTPGenerator;
 
 #[cfg(feature = "client")]
 use rand_core::OsRng;
+
+#[cfg(feature = "client")]
+use ark_serialize::CanonicalSerialize;
 
 use crate::types::*;
 use etf_crypto_primitives::{
@@ -40,10 +43,8 @@ use ckb_merkle_mountain_range::{
         MemMMR,
         MemStore,
     },
-    MMRStore,
 };
-use ark_serialize::CanonicalSerialize;
-use codec::Encode;
+
 use sha3::Digest;
 
 #[derive(Debug)]
@@ -70,11 +71,16 @@ impl MurmurStore {
     /// then it encrypts the resulting codes and constructs leaves 
     /// the leaves can be used to generate an MMR
     ///
+    /// * `seed`: An any-length seed (i.e. password)
+    /// * `block_schedule`: The blocks for which OTP codes will be generated
+    /// * `ephemeral_msk`: Any 32 bytes
+    /// * `round_public_key`: The IDN beacon's public key
+    ///
     pub fn new<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
         seed: Vec<u8>,
         block_schedule: Vec<BlockNumber>,
         ephemeral_msk: [u8;32],
-        pk: DoublePublicKey<E>,
+        round_public_key: DoublePublicKey<E>,
     ) -> Self {
         let totp = build_generator(&seed.clone());
         let mut metadata = BTreeMap::new();
@@ -87,7 +93,7 @@ impl MurmurStore {
             let identity = I::build_identity(*i);
             let ct_bytes = timelock_encrypt::<E>(
                 identity,
-                pk.1,
+                round_public_key.1,
                 ephemeral_msk,
                 otp_code.as_bytes(),
             );
@@ -110,6 +116,10 @@ impl MurmurStore {
     /// a possible fix is to externalize mmr logic
     ///
     /// TODO: this should probably be a result, not option
+    ///
+    /// * `seed`: The seed used to create the mmr
+    /// * `when`: The block number when the wallet is being used (or will be)
+    /// * `call_data`: The call to be executed with the wallet (at `when`)
     pub fn execute(
         &self, 
         seed: Vec<u8>, 
@@ -117,7 +127,6 @@ impl MurmurStore {
         call_data: Vec<u8>
     ) -> Option<(MerkleProof::<Leaf, MergeLeaves>, Vec<u8>, Ciphertext, u64)> {
         let mmr = self.to_mmr();
-        let store = mmr.store();
         let commitment = MurmurStore::commit(seed.clone(), when, &call_data.clone());
         // generate the merkle proof here and fetch the ciphertext
         if let Some(ciphertext) = self.metadata.get(&when) {
@@ -149,7 +158,7 @@ impl MurmurStore {
     fn to_mmr(&self) -> MemMMR<Leaf, MergeLeaves> {
         let store = MemStore::default();
         let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
-        for (block_number, ciphertext) in self.metadata.clone() {
+        for (_block_number, ciphertext) in self.metadata.clone() {
             mmr.push(Leaf(ciphertext)).expect("todo");
         }
 
@@ -166,8 +175,8 @@ pub fn timelock_encrypt<E: EngineBLS>(
     message: &[u8],
 ) -> Vec<u8> {
     let ciphertext = tle::<E, OsRng>(
-        pk.clone(), 
-        ephemeral_msk.clone(),
+        pk, 
+        ephemeral_msk,
         message,
         identity,
         OsRng, // TODO
@@ -214,15 +223,19 @@ pub fn verify(
     validity
 }
 
-pub fn get_key_index<K: Ord>(b: &BTreeMap<K, impl alloc::fmt::Debug>, key: &K) -> Option<usize> {
+/// get the index of a key in a BTreeMap
+pub fn get_key_index<K: Ord>(
+    b: &BTreeMap<K, impl alloc::fmt::Debug>, 
+    key: &K
+) -> Option<usize> {
     b.keys().position(|k| k == key)
 }
 
+#[cfg(test)]
 mod tests {
     
     use super::*;
-    use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, TinyBLS377};
-    use ckb_merkle_mountain_range::helper::leaf_index_to_pos;
+    use w3f_bls::{DoublePublicKeyScheme, TinyBLS377};
 
     pub struct DummyIdBuilder;
     impl IdentityBuilder<BlockNumber> for DummyIdBuilder {

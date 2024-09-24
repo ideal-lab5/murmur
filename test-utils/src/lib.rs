@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// #![no_std]
-#![cfg_attr(not(feature = "std"), no_std)]
-//! the murmur core library
+#![no_std]
+
+//! various utilities helpful for testing
+
 extern crate alloc;
 
-#[cfg(feature = "client")]
-pub mod otp;
+// mod murmur_core;
 
-pub mod murmur;
-pub mod types;
+#[cfg(test)]
+pub use murmur_core::otp::BOTPGenerator;
+
+#[cfg(test)]
+pub use murmur_core::murmur::MurmurStore;

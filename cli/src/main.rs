@@ -59,7 +59,7 @@ use std::io;
 //     DefaultTerminal,
 // };
 
-use node_template_runtime::{self, MurmurCall, RuntimeCall, BalancesCall};
+// use node_template_runtime::{self, MurmurCall, RuntimeCall, BalancesCall};
 
 use subxt::ext::codec::Encode;
 use beefy::{known_payloads, Payload, Commitment, VersionedFinalityProof};
@@ -70,13 +70,14 @@ use murmur_core::{
         BlockNumber,
         Leaf,
         MergeLeaves,
+        Identity,
         IdentityBuilder,
         Ciphertext,
     },
     murmur::MurmurStore,
 };
 use etf_crypto_primitives::{
-    ibe::fullident::{IBESecret, Identity},
+    ibe::fullident::{IBESecret},
     encryption::tlock::{TLECiphertext, tle}
 };
 
@@ -86,11 +87,10 @@ use rand_core::OsRng;
 
 use w3f_bls::{EngineBLS, TinyBLS377, SerializableToBytes, DoublePublicKey};
 
-use sp_keyring::AccountKeyring;
-use frame_support::{BoundedVec, traits::ConstU32};
+// use sp_keyring::AccountKeyring;
+// use frame_support::{BoundedVec, traits::ConstU32};
 
 use std::time::Instant;
-use indicatif::ProgressBar;
 
 /// Command line
 #[derive(Parser)]
@@ -170,7 +170,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
 
-    // let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes).unwrap();
     println!("🔑 Successfully retrieved the round public key.");
     let current_block = client.blocks().at_latest().await?;
     let current_block_number = current_block.header().number;
@@ -263,7 +262,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let store: MurmurStore = load_mmr_store();
             // store.to_mmr(&mut mmr).unwrap();
             
-            let tx = prepare_execute::<TinyBLS377>(
+            let tx = prepare_execute(
                 // etf.clone(),
                 args.name.clone().as_bytes().to_vec(),
                 args.seed.clone().as_bytes().to_vec(),
@@ -282,11 +281,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// fn get_key_index<K: Ord>(
-//     b: &BTreeMap<K, impl std::fmt::Debug>, key: &K) -> Option<usize> {
-//     b.keys().position(|k| k == key)
-// }
-
+/// create a new MMR and use it to generate a valid call to create a murmur wallet
+/// returns the call data and the mmr_store
+///
+/// * `name`: The name of the murmur wallet
+/// * `seed`: The seed used to generate otp codes
+/// * `ephem_msk`: An ephemeral secret key TODO: replace with an hkdf?
+/// * `block_schedule`: A list of block numbers when the wallet will be executable
+/// * `round_pubkey_bytes`: The Ideal Network randomness beacon public key
+///
 pub async fn create(
     name: String,
     seed: String,
@@ -321,7 +324,7 @@ pub async fn create(
 ///  We could potentially use that idea as a way to optimize the execute function in general. Rather than
 ///  loading the entire MMR into memory, we really only need to load a  minimal subtree containing the leaf we want to consume
 /// -> add this to the 'future work' section later
-pub async fn prepare_execute<E: EngineBLS>(
+pub async fn prepare_execute(
     name: Vec<u8>,
     seed: Vec<u8>,
     when: BlockNumber,
@@ -455,29 +458,30 @@ mod tests {
 
 
 
-// use sha3::Digest;
+// // use sha3::Digest;
 
-// fn main() -> io::Result<()>  {
-//     let mut terminal = ratatui::init();
-//     terminal.clear()?;
-//     let app_result = run(terminal);
-//     ratatui::restore();
-//     app_result
+// fn main() -> Result<(), Box<dyn std::error::Error>>  {
+//     // let mut terminal = ratatui::init();
+//     // terminal.clear()?;
+//     // let app_result = run(terminal);
+//     // ratatui::restore();
+//     // app_result
+//     Ok(())
 // }
 
-// fn run(mut terminal: DefaultTerminal) -> io::Result<()> {
-//     loop {
-//         terminal.draw(|frame| {
-//             let greeting = Paragraph::new("Hello Ratatui! (press 'q' to quit)")
-//                 .white()
-//                 .on_blue();
-//             frame.render_widget(greeting, frame.area());
-//         })?;
+// // fn run(mut terminal: DefaultTerminal) -> io::Result<()> {
+// //     loop {
+// //         terminal.draw(|frame| {
+// //             let greeting = Paragraph::new("Hello Ratatui! (press 'q' to quit)")
+// //                 .white()
+// //                 .on_blue();
+// //             frame.render_widget(greeting, frame.area());
+// //         })?;
 
-//         if let event::Event::Key(key) = event::read()? {
-//             if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-//                 return Ok(());
-//             }
-//         }
-//     }
-// }
+// //         if let event::Event::Key(key) = event::read()? {
+// //             if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
+// //                 return Ok(());
+// //             }
+// //         }
+// //     }
+// // }

@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-use ckb_merkle_mountain_range::{Merge, Result as MMRResult, MerkleProof};
+use ckb_merkle_mountain_range::{Merge, Result as MMRResult};
 pub use etf_crypto_primitives::ibe::fullident::Identity;
-use codec::{Decode, Encode};
 use sha3::Digest;
 use alloc::vec::Vec;
 
