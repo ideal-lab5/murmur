@@ -1,0 +1,21 @@
+[package]
+name = "murmur-core-wasm"
+version = "0.1.0-dev"
+description = "`murmur-core` compiled to wasm"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+crate-type = [
+    "cdylib",
+    "rlib", 
+]
+
+[dependencies]
+murmur-core = { path = "../core", package = "murmur-core", default-features = false }
+wasm-bindgen = { version = "0.2", default-features = false }
+
+[lints]
+workspace = true

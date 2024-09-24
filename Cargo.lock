@@ -4611,6 +4611,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "murmur-core-wasm"
+version = "0.1.0-dev"
+dependencies = [
+ "murmur-core",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "nalgebra"
 version = "0.32.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6044,7 +6052,6 @@ dependencies = [
  "frame-support",
  "frame-system",
  "log",
- "murmur-core",
  "pallet-proxy 28.1.0",
  "pallet-randomness-beacon",
  "parity-scale-codec",

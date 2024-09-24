@@ -2,13 +2,14 @@
 members = [
 	"core/",
     "cli/",
+    "core-wasm",
 ]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
-authors = ["Ideal Labs <driemworks@idealabs.network>"]
-repository = "https://github.com/ideal-lab5/etf"
+authors = ["Ideal Labs <hello@idealabs.network>"]
+repository = "https://github.com/ideal-lab5/murmur"
 homepage = "https://idealabs.network"
 
 [workspace.lints.rust]
