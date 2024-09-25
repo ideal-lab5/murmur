@@ -1,8 +1,8 @@
 [workspace]
 members = [
-	# "core/",
+	"core/",
     "cli/",
-    # "test-utils/",
+    "test-utils/",
 ]
 resolver = "2"
 
@@ -11,6 +11,7 @@ edition = "2021"
 authors = ["Ideal Labs <driemworks@idealabs.network>"]
 repository = "https://github.com/ideal-lab5/etf"
 homepage = "https://idealabs.network"
+license = "Apache-2.0"
 
 [workspace.lints.rust]
 suspicious_double_ref_op = { level = "allow", priority = 2 }

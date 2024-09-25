@@ -47,29 +47,27 @@ use ckb_merkle_mountain_range::{
 
 use sha3::Digest;
 
+/// Error types for murmur wallet usage
 #[derive(Debug)]
 pub enum Error {
     ExecuteError,
     MMRError,
 }
 
-/// the murmur store
+/// The murmur store contains minimal data required to use a murmur wallet
 #[cfg(feature = "client")]
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MurmurStore {
-    /// map block numbers to positions in the mmr
+    /// A map of block numbers to leaf positions in the mmr
     pub metadata: BTreeMap<BlockNumber, Ciphertext>,
-    /// the root of the mmr
+    /// The root of the mmr
     pub root: Leaf,
 }
 
 #[cfg(feature = "client")]
 impl MurmurStore {
 
-    /// creates the leaves needed to generate an MMR
-    /// This function generates otp codes for the given block schedule
-    /// then it encrypts the resulting codes and constructs leaves 
-    /// the leaves can be used to generate an MMR
+    /// Create a new Murmur store 
     ///
     /// * `seed`: An any-length seed (i.e. password)
     /// * `block_schedule`: The blocks for which OTP codes will be generated
@@ -109,10 +107,10 @@ impl MurmurStore {
         }
     }
 
-    /// build the parameters needed to use a murmur wallet
+    /// Build data required (proof and commitment) to execute a valid call from a murmur wallet
     /// note: this rebuilds the entire mmr
     /// we can look into ways to optimize this in the future
-/// the main issue is that he MemStore is not serializable
+    /// the main issue is that he MemStore is not serializable
     /// a possible fix is to externalize mmr logic
     ///
     /// TODO: this should probably be a result, not option
@@ -138,9 +136,12 @@ impl MurmurStore {
         None
     }
 
-    /// use the seed to commit to some data at a specific block number
-    /// i.e. this commit cannot be verified until there is a signature
-    ///      output from IDN for `when`
+    /// Generate a commitment (hash) to commit to executing a call at a specific block number
+    ///
+    /// * `seed`: The seed used to generated the MMR
+    /// * `when`: The block number when the commitment is verifiable
+    /// * `data`: The data to commit to
+    ///
     fn commit(seed: Vec<u8>, when: BlockNumber, data: &[u8]) -> Vec<u8> {
         let botp = build_generator(&seed);
         let otp_code = botp.generate(when);
@@ -151,7 +152,7 @@ impl MurmurStore {
         hasher.finalize().to_vec()
     }
 
-    /// builds an mmr from the mmr store
+    /// Builds an mmr from the mmr store
     ///
     /// * `mmr`: a MemMMR instance (to be populated)
     ///
@@ -167,7 +168,7 @@ impl MurmurStore {
 }
 
 #[cfg(feature = "client")]
-/// timelock encryption function
+/// Timelock encryption helper function
 pub fn timelock_encrypt<E: EngineBLS>(
     identity: Identity,
     pk: E::PublicKeyGroup,
@@ -248,7 +249,6 @@ mod tests {
     #[test]
     pub fn it_can_generate_mmr_data_store() {
         let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
-	    // let msk = keypair.secret.0; // can destroy this
 	    let double_public: DoublePublicKey<TinyBLS377> =  DoublePublicKey(
 		    keypair.into_public_key_in_signature_group().0,
 		    keypair.public.0,
@@ -265,7 +265,6 @@ mod tests {
             double_public,
         );
 
-        // 
         assert!(murmur_store.metadata.keys().len() == 3);
     }
 

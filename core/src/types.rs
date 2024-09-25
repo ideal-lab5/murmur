@@ -19,13 +19,14 @@ pub use etf_crypto_primitives::ibe::fullident::Identity;
 use sha3::Digest;
 use alloc::vec::Vec;
 
-/// the type to represent a block number
+/// The type to represent a block number
 pub type BlockNumber = u32;
 
+/// An opaque ciphertext type
 pub type Ciphertext = Vec<u8>;
 
 /// A leaf in the MMR
-/// the payload is an opaque, any-length vec
+/// The payload is an opaque, any-length vec
 #[derive(
     Eq, PartialEq, Clone, Debug, Default, 
     serde::Serialize, serde::Deserialize
@@ -40,7 +41,7 @@ impl From<Vec<u8>> for Leaf {
     }
 }
 
-/// merge leaves together with a sha256 hasher
+/// Merge leaves together with a sha256 hasher
 #[derive(Debug)]
 pub struct MergeLeaves;
 impl Merge for MergeLeaves {
@@ -54,7 +55,7 @@ impl Merge for MergeLeaves {
     }
 }
 
-/// something that builds unique identities (e.g. using crypto hash function) for any block number
+/// Something that builds unique identities (e.g. using crypto hash function) for any block number
 pub trait IdentityBuilder<BlockNumber> {
     fn build_identity(at: BlockNumber) -> Identity;
 }

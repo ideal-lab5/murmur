@@ -20,14 +20,17 @@ use alloc::{
     string::String,
 };
 
-/// a block based otp generator
+/// A block based otp generator
 pub struct BOTPGenerator {
-    /// the time-based otp generator
+    /// The time-based otp generator
     totp: TOTP
 }
 
 impl BOTPGenerator {
-    /// create a new BOTP generator with the given seed
+    /// Create a new BOTP generator with the given seed
+    ///
+    /// * `seed`: The seed used to generate OTP codes
+    ///
     pub fn new(seed: Vec<u8>) -> Self {
         let secret = Secret::Raw(seed.to_vec()).to_bytes().unwrap();
         let totp = TOTP::new(
@@ -41,7 +44,10 @@ impl BOTPGenerator {
         BOTPGenerator { totp }
     }
 
-    /// generate an otp code
+    /// Generate an otp code
+    ///
+    /// * `block_height`: The block for which the code is valid
+    ///
     pub fn generate(&self, block_height: u32) -> String {
         self.totp.generate(block_height as u64)
     }

@@ -18,7 +18,7 @@
 use subxt::{
     client::OnlineClient,
     config::SubstrateConfig,
-    backend::rpc::{RpcClient, RpcParams},
+    backend::rpc::RpcClient,
 };
 use subxt_signer::sr25519::dev;
 
@@ -26,57 +26,23 @@ use subxt_signer::sr25519::dev;
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
 pub mod etf {}
 
-use std::collections::BTreeMap;
-use std::ops::Index;
-use std::io::{Read, Write, BufRead, BufReader};
 use std::fs::File;
-use std::time::Duration;
-use std::collections::HashMap;
 
-use clap::{Args, Parser, Subcommand};
-
-use ckb_merkle_mountain_range::{
-    helper::leaf_index_to_pos,
-    MerkleProof,
-    MMR, Merge, Result as MMRResult, MMRStore,
-    util::{
-        MemMMR,
-        MemStore
-    },
-};
-
-use rand_chacha::{
-    ChaCha20Rng,
-    rand_core::SeedableRng,
-};
-
-use std::io;
+use clap::{Parser, Subcommand};
 
 use subxt::ext::codec::Encode;
-use beefy::{known_payloads, Payload, Commitment, VersionedFinalityProof};
-use sp_core::{Bytes, Decode};
+use beefy::{known_payloads, Payload, Commitment};
 
 use murmur_core::{
     types::{
         BlockNumber,
-        Leaf,
-        MergeLeaves,
         Identity,
         IdentityBuilder,
-        Ciphertext,
     },
     murmur::MurmurStore,
 };
-use etf_crypto_primitives::{
-    ibe::fullident::{IBESecret},
-    encryption::tlock::{TLECiphertext, tle}
-};
 
-use ark_serialize::CanonicalDeserialize;
-use ark_ff::UniformRand;
-use rand_core::OsRng;
-
-use w3f_bls::{EngineBLS, TinyBLS377, SerializableToBytes, DoublePublicKey};
+use w3f_bls::{TinyBLS377, SerializableToBytes, DoublePublicKey};
 
 use std::time::Instant;
 
@@ -180,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut schedule: Vec<BlockNumber> = Vec::new();
             for i in 2..args.validity + 2 {
                 // wallet is 'active' in 2 blocks 
-                let next_block = current_block_number.clone() + i as u32;
+                let next_block = current_block_number + i;
                 schedule.push(next_block);
             }
             // 2. create mmr
@@ -196,7 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // TODO: make the origin configurable
             // sign and send the call
             let from = dev::alice();
-            let events = etf
+            let _events = etf
                 .tx()
                 .sign_and_submit_then_watch_default(&call, &from)
                 .await?;
@@ -259,7 +225,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 balance_transfer_call,
             ).await;
             // submit the tx using alice to sign it
-            etf.tx()
+            let _result = etf.tx()
                 .sign_and_submit_then_watch_default(&tx, &dev::alice())
                 .await;
         },
@@ -297,7 +263,7 @@ pub async fn create(
     let call = etf::tx()
         .murmur()
         .create(
-            root.0.into(),
+            root.0,
             mmr_store.metadata.len() as u64,
             etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(name));
     (call, mmr_store)
@@ -318,15 +284,10 @@ pub async fn prepare_execute(
     when: BlockNumber,
     store: MurmurStore,
     call: etf::runtime_types::node_template_runtime::RuntimeCall,
-) -> subxt::tx::Payload<etf::murmur::calls::types::Proxy> {   
-    let call_data = call.encode();
-
-    let root = store.root.clone();
-
+) -> subxt::tx::Payload<etf::murmur::calls::types::Proxy> {
     let (proof, commitment, ciphertext, pos) = store.execute(
         seed.clone(), when, call.encode().to_vec(),
     ).unwrap();
-
     let proof_items: Vec<Vec<u8>> = proof.proof_items().iter()
         .map(|leaf| leaf.0.to_vec().clone())
         .collect::<Vec<_>>();
@@ -430,8 +391,8 @@ fn load_mmr_store() -> MurmurStore {
 
 /// Write the MMR data to a file (no seed)
 fn write_mmr_store(mmr_store: MurmurStore) {
-    let mut mmr_store_file = File::create("mmr_store")
-        .expect("should be ok");
+    let mmr_store_file = File::create("mmr_store")
+        .expect("It should create the file");
     // TODO: error handling
     serde_cbor::to_writer(mmr_store_file, &mmr_store)
         .unwrap();

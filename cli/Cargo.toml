@@ -3,8 +3,7 @@ name = "murmur-cli"
 version = "0.1.0"
 edition = "2021"
 authors.workspace = true
-
-# # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license.workspace = true
 
 [dependencies]
 subxt = "0.35.2"
@@ -18,18 +17,12 @@ ckb-merkle-mountain-range = "0.5.2"
 sha3 = "0.10.8"
 serde_cbor = "0.11.2"
 serde_json = "1.0.108"
-# sp-keyring = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
-# frame-support = {  git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
-# node-template-runtime = { git = "https://github.com/ideal-lab5/etf.git", branch = "tony/dev" }
 codec = { package = "parity-scale-codec", version = "3.6.12", features = [
 	"derive",
 ] }
 serde = { version = "1.0.188", features = ["alloc", "derive"] }
 sp-core = { git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing", features = ["bls-experimental"] }
-# sp-runtime = { git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing" }
-# beefy = { package = "sp-consensus-beefy-etf", git = "https://github.com/ideal-lab5/etf.git", branch = "tony/dev", features = ["bls-experimental"] } 
-beefy = { package = "sp-consensus-beefy-etf", path = "../../etf/primitives/consensus/beefy-etf/", features = ["bls-experimental"] } 
-# sp-application-crypto = { git = "https://github.com/ideal-lab5/polkadot-sdk.git", branch = "testing", features = ["bls-experimental"] }
+beefy = { package = "sp-consensus-beefy-etf", git = "https://github.com/ideal-lab5/etf.git", branch = "murmur", features = ["bls-experimental"] }
 
 ark-bls12-377 = "0.4.0"
 ark-std = "0.4.0"

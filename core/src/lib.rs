@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// #![no_std]
 #![cfg_attr(not(feature = "std"), no_std)]
 //! the murmur core library
+
 extern crate alloc;
 
 #[cfg(feature = "client")]

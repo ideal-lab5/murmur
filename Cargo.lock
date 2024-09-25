@@ -2645,6 +2645,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "murmur-test-utils"
+version = "0.1.0"
+dependencies = [
+ "ark-bls12-377",
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
+ "array-bytes",
+ "ckb-merkle-mountain-range",
+ "etf-crypto-primitives 0.2.4 (git+https://github.com/ideal-lab5/etf-sdk/?branch=tony/dev)",
+ "getrandom",
+ "hex",
+ "murmur-core",
+ "parity-scale-codec",
+ "rand_core",
+ "serde",
+ "sha3",
+ "totp-rs",
+ "w3f-bls",
+]
+
+[[package]]
 name = "no-std-net"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4178,6 +4200,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-beefy-etf"
 version = "13.0.0"
+source = "git+https://github.com/ideal-lab5/etf.git?branch=murmur#47eff7c36775c43674cbbadb25a8daef7c182d49"
 dependencies = [
  "ark-serialize",
  "ark-std",
