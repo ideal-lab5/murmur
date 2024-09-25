@@ -187,7 +187,7 @@ pub fn timelock_encrypt<E: EngineBLS>(
     ct_bytes
 }
 
-/// build a block-otp generator from the seed
+/// Build a block-otp generator from the seed
 #[cfg(feature = "client")]
 fn build_generator(seed: &[u8]) -> BOTPGenerator {
     let mut hasher = sha3::Sha3_256::default();
