@@ -52,15 +52,6 @@ use rand_chacha::{
 
 use std::io;
 
-// use ratatui::{
-//     crossterm::event::{self, KeyCode, KeyEventKind},
-//     style::Stylize,
-//     widgets::Paragraph,
-//     DefaultTerminal,
-// };
-
-// use node_template_runtime::{self, MurmurCall, RuntimeCall, BalancesCall};
-
 use subxt::ext::codec::Encode;
 use beefy::{known_payloads, Payload, Commitment, VersionedFinalityProof};
 use sp_core::{Bytes, Decode};
@@ -86,9 +77,6 @@ use ark_ff::UniformRand;
 use rand_core::OsRng;
 
 use w3f_bls::{EngineBLS, TinyBLS377, SerializableToBytes, DoublePublicKey};
-
-// use sp_keyring::AccountKeyring;
-// use frame_support::{BoundedVec, traits::ConstU32};
 
 use std::time::Instant;
 
@@ -453,35 +441,3 @@ fn write_mmr_store(mmr_store: MurmurStore) {
 mod tests {
     // pub fn test_can_read_write_mmr_store() { }
 }
-
-
-
-
-
-// // use sha3::Digest;
-
-// fn main() -> Result<(), Box<dyn std::error::Error>>  {
-//     // let mut terminal = ratatui::init();
-//     // terminal.clear()?;
-//     // let app_result = run(terminal);
-//     // ratatui::restore();
-//     // app_result
-//     Ok(())
-// }
-
-// // fn run(mut terminal: DefaultTerminal) -> io::Result<()> {
-// //     loop {
-// //         terminal.draw(|frame| {
-// //             let greeting = Paragraph::new("Hello Ratatui! (press 'q' to quit)")
-// //                 .white()
-// //                 .on_blue();
-// //             frame.render_widget(greeting, frame.area());
-// //         })?;
-
-// //         if let event::Event::Key(key) = event::read()? {
-// //             if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-// //                 return Ok(());
-// //             }
-// //         }
-// //     }
-// // }
