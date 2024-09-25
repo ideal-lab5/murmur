@@ -112,7 +112,7 @@ impl MurmurStore {
     /// build the parameters needed to use a murmur wallet
     /// note: this rebuilds the entire mmr
     /// we can look into ways to optimize this in the future
-    /// the main issue is that he MemStore is not serializable
+/// the main issue is that he MemStore is not serializable
     /// a possible fix is to externalize mmr logic
     ///
     /// TODO: this should probably be a result, not option
