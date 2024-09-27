@@ -44,7 +44,6 @@ use ckb_merkle_mountain_range::{
         MemStore,
     },
 };
-
 use sha3::Digest;
 
 /// Error types for murmur wallet usage
@@ -75,7 +74,7 @@ impl MurmurStore {
     /// * `round_public_key`: The IDN beacon's public key
     ///
     pub fn new<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
-        seed: Vec<u8>,
+        mut seed: Vec<u8>,
         block_schedule: Vec<BlockNumber>,
         ephemeral_msk: [u8;32],
         round_public_key: DoublePublicKey<E>,
@@ -87,7 +86,7 @@ impl MurmurStore {
         let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
         
         for i in &block_schedule {
-            let otp_code = totp.generate(*i);
+            let mut otp_code = totp.generate(*i);
             let identity = I::build_identity(*i);
             let ct_bytes = timelock_encrypt::<E>(
                 identity,
@@ -100,7 +99,6 @@ impl MurmurStore {
             metadata.insert(*i, ct_bytes);
         }
 
-       
         MurmurStore {
             metadata,
             root: mmr.get_root().unwrap().clone(),
@@ -120,15 +118,14 @@ impl MurmurStore {
     /// * `call_data`: The call to be executed with the wallet (at `when`)
     pub fn execute(
         &self, 
-        seed: Vec<u8>, 
+        mut seed: Vec<u8>, 
         when: BlockNumber, 
         call_data: Vec<u8>
     ) -> Option<(MerkleProof::<Leaf, MergeLeaves>, Vec<u8>, Ciphertext, u64)> {
-        let mmr = self.to_mmr();
-        let commitment = MurmurStore::commit(seed.clone(), when, &call_data.clone());
-        // generate the merkle proof here and fetch the ciphertext
         if let Some(ciphertext) = self.metadata.get(&when) {
+            let commitment = MurmurStore::commit(seed.clone(), when, &call_data.clone());
             let pos = get_key_index(&self.metadata, &when).unwrap() as u64;
+            let mmr = self.to_mmr();
             let proof = mmr.gen_proof(vec![pos]).expect("todo: handle error");
             return Some((proof, commitment, ciphertext.clone(), pos));
         }
@@ -142,12 +139,13 @@ impl MurmurStore {
     /// * `when`: The block number when the commitment is verifiable
     /// * `data`: The data to commit to
     ///
-    fn commit(seed: Vec<u8>, when: BlockNumber, data: &[u8]) -> Vec<u8> {
+    fn commit(mut seed: Vec<u8>, when: BlockNumber, data: &[u8]) -> Vec<u8> {
         let botp = build_generator(&seed);
-        let otp_code = botp.generate(when);
+        let mut otp_code = botp.generate(when);
 
         let mut hasher = sha3::Sha3_256::default();
         hasher.update(otp_code.as_bytes());
+
         hasher.update(data);
         hasher.finalize().to_vec()
     }
@@ -172,7 +170,7 @@ impl MurmurStore {
 pub fn timelock_encrypt<E: EngineBLS>(
     identity: Identity,
     pk: E::PublicKeyGroup,
-    ephemeral_msk: [u8;32],
+    mut ephemeral_msk: [u8;32],
     message: &[u8],
 ) -> Vec<u8> {
     let ciphertext = tle::<E, OsRng>(
@@ -180,7 +178,7 @@ pub fn timelock_encrypt<E: EngineBLS>(
         ephemeral_msk,
         message,
         identity,
-        OsRng, // TODO
+        OsRng,
     ).unwrap(); // TODO: Error Handling
     let mut ct_bytes = Vec::new();
     ciphertext.serialize_compressed(&mut ct_bytes).unwrap();
@@ -279,7 +277,7 @@ mod tests {
 
         let ephem_msk = [1;32];
         let seed = vec![1,2,3];
-        let schedule = vec![1,2,3];
+        let schedule = vec![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
 
         let aux_data = vec![2,3,4,5];
 
@@ -297,6 +295,24 @@ mod tests {
         let (proof, commitment, ciphertext, pos) = murmur_store
             .execute(seed.clone(), when, aux_data.clone())
             .unwrap();
+
+        assert!(proof.verify(root.clone(), vec![(pos, Leaf(ciphertext.clone()))]).unwrap());
+        // // we also simulate the serialization of the proof items
+        // let proof_items: Vec<Vec<u8>> = proof.proof_items().iter()
+        //     .map(|leaf| leaf.0.to_vec().clone())
+        //     .collect::<Vec<_>>();
+
+        // let leaves: Vec<Leaf> = proof_items.clone().into_iter()
+        //     .map(|p| Leaf(p)).collect::<Vec<_>>();
+        // let new_merkle_proof = MerkleProof::<Leaf, MergeLeaves>::new(
+        //     proof.mmr_size() as u64, leaves);
+        // let root_bytes = root.0.clone();
+        // let new_root = Leaf(root_bytes);
+
+        // let test = new_merkle_proof.verify(new_root.clone(), vec![(pos.clone(), Leaf(ciphertext.clone()))]).unwrap();
+        // assert!(test == true);
+
+
 
         // in practice, the otp code would be timelock decrypted
         // but for testing purposes, we will just calculate the expected one now

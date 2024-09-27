@@ -2619,6 +2619,7 @@ dependencies = [
  "sp-core",
  "subxt",
  "subxt-signer",
+ "thiserror",
  "tokio",
  "w3f-bls",
 ]
@@ -2642,6 +2643,7 @@ dependencies = [
  "sha3",
  "totp-rs",
  "w3f-bls",
+ "zeroize",
 ]
 
 [[package]]
