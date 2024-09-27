@@ -3,6 +3,7 @@ members = [
 	"core/",
     "cli/",
     "test-utils/",
+    "lib/",
 ]
 resolver = "2"
 
