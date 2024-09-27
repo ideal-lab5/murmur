@@ -4611,6 +4611,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "murmur-lib"
+version = "0.1.0"
+dependencies = [
+ "murmur-core",
+ "sp-consensus-beefy-etf 13.0.0 (git+https://github.com/ideal-lab5/etf.git?branch=tony/dev)",
+ "subxt",
+ "w3f-bls",
+]
+
+[[package]]
 name = "nalgebra"
 version = "0.32.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6044,7 +6054,6 @@ dependencies = [
  "frame-support",
  "frame-system",
  "log",
- "murmur-core",
  "pallet-proxy 28.1.0",
  "pallet-randomness-beacon",
  "parity-scale-codec",
