@@ -5,7 +5,7 @@ edition = "2021"
 authors.workspace = true
 
 [dependencies]
-beefy = { package = "sp-consensus-beefy-etf", git = "https://github.com/ideal-lab5/etf.git", branch = "murmur", features = ["bls-experimental"] }
+beefy = { package = "sp-consensus-beefy-etf", git = "https://github.com/ideal-lab5/pallets.git", branch = "main", features = ["bls-experimental"] }
 murmur-core = { package = "murmur-core", path = "../core/", features = ["client"] }
 subxt = "0.35.2"
 w3f-bls = "0.1.3"

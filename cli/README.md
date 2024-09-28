@@ -6,6 +6,14 @@ It allows for the creation and exeuction of ephemeral 'murmur' wallets on the Id
 
 ## Setup
 
+Install the cli with
+
+``` shell
+cargo install murmur
+# verify it works
+murmur --help
+```
+
 To setup a dev environment:
 - run a local [IDN solochain node](https://github.com/ideal-lab5/etf)
 - [generate metadata](#generating-metadata-for-the-chain)

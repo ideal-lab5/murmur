@@ -2604,10 +2604,9 @@ dependencies = [
  "ckb-merkle-mountain-range",
  "clap",
  "crossterm",
- "etf-crypto-primitives 0.2.4 (git+https://github.com/ideal-lab5/etf-sdk/?branch=tony/dev)",
  "getrandom",
  "hex",
- "murmur-core",
+ "murmur-lib",
  "parity-scale-codec",
  "rand_chacha",
  "rand_core",
@@ -2616,7 +2615,7 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "sha3",
- "sp-consensus-beefy-etf",
+ "sp-consensus-beefy-etf 13.0.0 (git+https://github.com/ideal-lab5/etf.git?branch=murmur)",
  "sp-core",
  "subxt",
  "subxt-signer",
@@ -2652,7 +2651,7 @@ name = "murmur-lib"
 version = "0.1.0"
 dependencies = [
  "murmur-core",
- "sp-consensus-beefy-etf",
+ "sp-consensus-beefy-etf 13.0.0 (git+https://github.com/ideal-lab5/pallets.git?branch=main)",
  "subxt",
  "w3f-bls",
 ]
@@ -4208,6 +4207,26 @@ source = "git+https://github.com/paritytech/arkworks-substrate#caa2eed74beb885dd
 dependencies = [
  "ark-ed-on-bls12-381-bandersnatch-ext",
  "sp-crypto-ec-utils",
+]
+
+[[package]]
+name = "sp-consensus-beefy-etf"
+version = "13.0.0"
+source = "git+https://github.com/ideal-lab5/pallets.git?branch=main#d9aa53506d59b350a23647a6c9b04e253955094d"
+dependencies = [
+ "lazy_static",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-api",
+ "sp-application-crypto",
+ "sp-core",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/ideal-lab5/polkadot-sdk.git?branch=testing)",
+ "sp-io",
+ "sp-keystore",
+ "sp-mmr-primitives",
+ "sp-runtime",
+ "strum 0.24.1",
 ]
 
 [[package]]

@@ -16,11 +16,19 @@
 
 use beefy::{known_payloads, Commitment, Payload};
 use murmur_core::{
-    murmur::MurmurStore,
-    types::{BlockNumber, Identity, IdentityBuilder},
+    types::{Identity, IdentityBuilder},
+};
+pub use murmur_core::types::BlockNumber;
+pub use murmur_core::murmur::MurmurStore;
+use etf::murmur::calls::types::{Create, Proxy};
+use etf::runtime_types::{
+    bounded_collections::bounded_vec::BoundedVec,
+    node_template_runtime::RuntimeCall,
 };
 use subxt::ext::codec::Encode;
-use w3f_bls::{DoublePublicKey, EngineBLS, SerializableToBytes, TinyBLS377};
+use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
+
+// pub mod MurmurStore;
 
 // Generate an interface that we can use from the node's metadata.
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
@@ -39,18 +47,23 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
         Identity::new(&commitment.encode())
     }
 }
-
-pub async fn create(
+/// create a new MMR and use it to generate a valid call to create a murmur wallet
+/// returns the call data and the mmr_store
+///
+/// * `name`: The name of the murmur proxy
+/// * `seed`: The seed used to generate otp codes
+/// * `ephem_msk`: An ephemeral secret key TODO: replace with an hkdf?
+/// * `block_schedule`: A list of block numbers when the wallet will be executable
+/// * `round_pubkey_bytes`: The Ideal Network randomness beacon public key
+///
+pub fn create(
     name: String,
     seed: String,
     ephem_msk: [u8; 32],
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
-) -> (
-    subxt::tx::Payload<etf::murmur::calls::types::Create>,
-    MurmurStore,
-) {
-    let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes).unwrap();
+) -> (subxt::tx::Payload<Create>, MurmurStore) {
+    let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes).unwrap(); // TODO: error handlking
     let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
         seed.clone().into(),
         block_schedule.clone(),
@@ -59,43 +72,52 @@ pub async fn create(
     );
     let root = mmr_store.root.clone();
     let name = name.as_bytes().to_vec();
-    let call = etf::tx().murmur().create(
-        root.0.into(),
-        mmr_store.metadata.len() as u64,
-        etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(name),
-    );
+
+    let call = etf::tx()
+        .murmur()
+        .create(root.0, mmr_store.metadata.len() as u64, BoundedVec(name));
     (call, mmr_store)
 }
 
-/// Prepare the call for immediate execution
-// Note: in the future, we can consider ways to prune the murmurstore as OTP codes are consumed
-//     for example, we can take the next values from the map, reducing storage to 0 over time
-//     However, to do this we need to think of a way to prove it with a merkle proof
-//     my though is that we would have a subtree, so first we prove that the subtree is indeed in the parent MMR
-//     then we prove that the specific leaf is in the subtree.
-//  We could potentially use that idea as a way to optimize the execute function in general. Rather than
-//  loading the entire MMR into memory, we really only need to load a  minimal subtree containing the leaf we want to consume
-// -> add this to the 'future work' section later
-pub async fn prepare_execute<E: EngineBLS>(
+/// prepare the call for immediate execution
+/// Note to self: in the future, we can consider ways to prune the murmurstore as OTP codes are consumed
+///     for example, we can take the next values from the map, reducing storage to 0 over time
+///     However, to do this we need to think of a way to prove it with a merkle proof
+///     my thought is that we would have a subtree, so first we prove that the subtree is indeed in the parent MMR
+///     then we prove that the specific leaf is in the subtree.
+///  We could potentially use that idea as a way to optimize the execute function in general. Rather than
+///  loading the entire MMR into memory, we really only need to load a  minimal subtree containing the leaf we want to consume
+/// -> add this to the 'future work' section later
+///
+/// * `name`: The name of the murmur proxy
+/// * `seed`: The seed used to generate otp codes
+/// * `when`: The block number when OTP codeds should be generated
+/// * `store`: A murmur store
+/// * `call`: Any valid runtime call
+///
+pub async fn prepare_execute(
     name: Vec<u8>,
     seed: Vec<u8>,
     when: BlockNumber,
     store: MurmurStore,
-    call: etf::runtime_types::node_template_runtime::RuntimeCall,
-) -> subxt::tx::Payload<etf::murmur::calls::types::Proxy> {
-    let (proof, commitment, ciphertext, pos) = store
-        .execute(seed.clone(), when, call.encode().to_vec())
-        .unwrap();
-
+    call: RuntimeCall,
+) -> subxt::tx::Payload<Proxy> {
+    let (proof, commitment, ciphertext, pos) =
+        store.execute(seed.clone(), when, call.encode()).unwrap();
+    let size: u64 = proof.mmr_size();
     let proof_items: Vec<Vec<u8>> = proof
         .proof_items()
         .iter()
-        .map(|leaf| leaf.0.to_vec().clone())
+        .map(|leaf| leaf.0.clone())
         .collect::<Vec<_>>();
 
-    let bounded = etf::runtime_types::bounded_collections::bounded_vec::BoundedVec(name);
-
-    etf::tx()
-        .murmur()
-        .proxy(bounded, pos, commitment, ciphertext, proof_items, call)
+    etf::tx().murmur().proxy(
+        BoundedVec(name),
+        pos,
+        commitment,
+        ciphertext,
+        proof_items,
+        size,
+        call,
+    )
 }

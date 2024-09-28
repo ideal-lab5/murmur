@@ -9,8 +9,7 @@ license.workspace = true
 subxt = "0.35.2"
 subxt-signer = "0.35.2"
 tokio = { version = "1.35", features = ["macros", "time", "rt-multi-thread"] }
-murmur-core = { package = "murmur-core", path = "../core/", features = ["client"] }
-etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "tony/dev" }
+murmur-lib = { package = "murmur-lib", path = "../lib/" }
 clap = { version = "4.1.1", features = ["derive"] }
 rand_chacha = "0.3.1"
 ckb-merkle-mountain-range = "0.5.2"
