@@ -103,7 +103,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             // 3. add to storage
             write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
-            // TODO: make the origin configurable
             // sign and send the call
             let from = dev::alice();
             let _events = client
@@ -115,7 +114,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Execute(args) => {
             // build balance transfer
             let bob = dev::alice().public_key();
-            // get the value argument
             let v: u128 = args
                 .amount
                 .split_whitespace()

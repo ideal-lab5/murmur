@@ -96,7 +96,7 @@ impl MurmurStore {
                 otp_code.as_bytes(),
             );
             let leaf = Leaf(ct_bytes.clone());
-            let _pos = mmr.push(leaf).expect("todo");//.map_err(|e| {
+            let _pos = mmr.push(leaf).expect("todo");
             metadata.insert(*i, ct_bytes);
         }
 
