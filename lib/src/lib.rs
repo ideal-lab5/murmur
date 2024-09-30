@@ -15,18 +15,16 @@
  */
 
 use beefy::{known_payloads, Commitment, Payload};
-use murmur_core::{
-    types::{Identity, IdentityBuilder},
-};
-pub use murmur_core::types::BlockNumber;
-pub use murmur_core::murmur::MurmurStore;
-use etf::murmur::calls::types::{Create, Proxy};
 use etf::runtime_types::{
-    bounded_collections::bounded_vec::BoundedVec,
-    node_template_runtime::RuntimeCall,
+    bounded_collections::bounded_vec::BoundedVec, node_template_runtime::RuntimeCall,
 };
+use murmur_core::types::{Identity, IdentityBuilder};
 use subxt::ext::codec::Encode;
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
+
+pub use etf::murmur::calls::types::{Create, Proxy};
+pub use murmur_core::{murmur::MurmurStore, types::BlockNumber};
+pub use subxt::tx::Payload as TxPayload;
 
 // Generate an interface that we can use from the node's metadata.
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
@@ -61,7 +59,7 @@ pub fn create(
     ephem_msk: [u8; 32],
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
-) -> (subxt::tx::Payload<Create>, MurmurStore) {
+) -> (TxPayload<Create>, MurmurStore) {
     let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes).unwrap(); // TODO: error handlking
     let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
         seed.clone().into(),
@@ -100,7 +98,7 @@ pub async fn prepare_execute(
     when: BlockNumber,
     store: MurmurStore,
     call: RuntimeCall,
-) -> subxt::tx::Payload<Proxy> {
+) -> TxPayload<Proxy> {
     let (proof, commitment, ciphertext, pos) =
         store.execute(seed.clone(), when, call.encode()).unwrap();
     let size: u64 = proof.mmr_size();
