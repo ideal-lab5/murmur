@@ -1,34 +1,72 @@
-[package]
-name = "otp-wallet-client"
-version = "0.1.0"
+[workspace]
+members = [
+	"core/",
+    "cli/",
+    "test-utils/",
+    "lib/",
+]
+resolver = "2"
+
+[workspace.package]
 edition = "2021"
+authors = ["Ideal Labs <driemworks@idealabs.network>"]
+repository = "https://github.com/ideal-lab5/murmur"
+homepage = "https://idealabs.network"
+license = "Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace.lints.rust]
+suspicious_double_ref_op = { level = "allow", priority = 2 }
 
-[dependencies]
-subxt = "0.34.0"
-subxt-signer = "0.34.0"
-tokio = { version = "1.35", features = ["macros", "time", "rt-multi-thread"] }
-totp-rs = "5.5.1"
-# etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "main" } 
-etf-crypto-primitives = { path = "../etf-sdk/etf-crypto-primitives" }
-clap = { version = "4.1.1", features = ["derive"] }
-rand_chacha = "0.3.1"
-ckb-merkle-mountain-range = "0.5.2"
-# blake2b = "0.10.6"
-sha3 = "0.10.8"
-serde_cbor = "0.11.2"
-# bytes = "1.4.0"
-serde_json = "1.0.108"
-indicatif = "0.17.8"
-sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "v1.4.0-rc1"  }
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "v1.4.0-rc1" }
-node-runtime = { path = "../etf/runtime" }
-codec = { package = "parity-scale-codec", version = "3.2.2", features = [
-	"derive",
-] }
-serde = { version = "1.0.188", features = ["alloc", "derive"] }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "v1.4.0-rc1" }
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "v1.4.0-rc1" }
-# pallet-balances = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", tag = "v1.4.0-rc1" }
+[workspace.lints.clippy]
+all = { level = "allow", priority = 0 }
+correctness = { level = "warn", priority = 1 }
+complexity = { level = "warn", priority = 1 }
+if-same-then-else = { level = "allow", priority = 2 }
+zero-prefixed-literal = { level = "allow", priority = 2 }            # 00_1000_000
+type_complexity = { level = "allow", priority = 2 }                  # raison d'etre
+nonminimal-bool = { level = "allow", priority = 2 }                  # maybe
+borrowed-box = { level = "allow", priority = 2 }                     # Reasonable to fix this one
+too-many-arguments = { level = "allow", priority = 2 }               # (Turning this on would lead to)
+needless-lifetimes = { level = "allow", priority = 2 }               # generated code
+unnecessary_cast = { level = "allow", priority = 2 }                 # Types may change
+identity-op = { level = "allow", priority = 2 }                      # One case where we do 0 +
+useless_conversion = { level = "allow", priority = 2 }               # Types may change
+unit_arg = { level = "allow", priority = 2 }                         # stylistic
+option-map-unit-fn = { level = "allow", priority = 2 }               # stylistic
+bind_instead_of_map = { level = "allow", priority = 2 }              # stylistic
+erasing_op = { level = "allow", priority = 2 }                       # E.g. 0 * DOLLARS
+eq_op = { level = "allow", priority = 2 }                            # In tests we test equality.
+while_immutable_condition = { level = "allow", priority = 2 }        # false positives
+needless_option_as_deref = { level = "allow", priority = 2 }         # false positives
+derivable_impls = { level = "allow", priority = 2 }                  # false positives
+stable_sort_primitive = { level = "allow", priority = 2 }            # prefer stable sort
+extra-unused-type-parameters = { level = "allow", priority = 2 }     # stylistic
+default_constructed_unit_structs = { level = "allow", priority = 2 } # stylistic
 
+[profile.release]
+opt-level = 3
+lto = "thin"
+incremental = true
+panic = 'unwind'
+
+[profile.bench]
+opt-level = 3
+debug = false
+rpath = false
+lto = "thin"
+incremental = true
+debug-assertions = false
+
+[profile.dev]
+opt-level = 0
+panic = 'unwind'
+
+[profile.test]
+opt-level = 3
+lto = "thin"
+incremental = true
+debug-assertions = true
+debug = true
+
+[workspace.metadata.release]
+dependent-version = "fix"
