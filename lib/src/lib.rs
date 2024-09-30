@@ -28,12 +28,11 @@ use etf::runtime_types::{
 use subxt::ext::codec::Encode;
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 
-// pub mod MurmurStore;
-
 // Generate an interface that we can use from the node's metadata.
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
 pub mod etf {}
 
+/// The BasicIdBuilder builds identities for the default IDN beacon
 #[derive(Debug)]
 pub struct BasicIdBuilder;
 impl IdentityBuilder<BlockNumber> for BasicIdBuilder {

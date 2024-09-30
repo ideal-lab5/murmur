@@ -22,6 +22,7 @@ use std::time::Instant;
 use clap::{Parser, Subcommand};
 use thiserror::Error;
 use etf::runtime_types::node_template_runtime::RuntimeCall::Balances;
+use sp_core::crypto::Ss58Codec;
 use murmur_lib::{
     etf, create, prepare_execute, 
     MurmurStore, BlockNumber
@@ -46,20 +47,22 @@ enum Commands {
 
 #[derive(Parser)]
 struct WalletCreationDetails {
-    #[arg(long)]
+    #[arg(long, short)]
     name: String,
-    #[arg(long)]
+    #[arg(long, short)]
     seed: String,
-    #[clap(long)]
+    #[clap(long, short)]
     validity: u32
 }
 
 #[derive(Parser)]
 struct WalletExecuteDetails {
-    #[arg(long)]
+    #[arg(long, short)]
     name: String,
-    #[arg(long)]
+    #[arg(long, short)]
     seed: String,
+    #[arg(long, short)]
+    to: String,
     #[arg(short, long)]
     amount: String
 }
@@ -78,7 +81,6 @@ pub const MMR_STORE_FILEPATH: &str = "mmr_store";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let before = Instant::now();
-    // TODO: HKDF? just hash the seed?
     let ephem_msk = [1; 32];
 
     let (client, current_block_number, round_pubkey_bytes) = idn_connect().await?;
@@ -113,14 +115,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Execute(args) => {
             // build balance transfer
-            let bob = dev::alice().public_key();
+            // let bob = dev::alice().public_key();
+            // let to_bytes: [u8; 32] = args.to.as_bytes().to_vec().try_into().unwrap();
+            let from_ss58 = sp_core::crypto::AccountId32::from_ss58check(&args.to)
+                .unwrap();
+
+            let bytes: &[u8] = from_ss58.as_ref();
+            let from_ss58_sized: [u8;32] = bytes.try_into().unwrap();
+            let to = subxt::utils::AccountId32::from(from_ss58_sized);
             let v: u128 = args
                 .amount
                 .split_whitespace()
                 .map(|r| r.replace('_', "").parse().unwrap())
                 .collect::<Vec<_>>()[0];
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
-                dest: subxt::utils::MultiAddress::<_, u32>::from(bob),
+                dest: subxt::utils::MultiAddress::<_, u32>::from(to),
                 value: v,
             });
 
