@@ -2530,6 +2530,7 @@ dependencies = [
  "ckb-merkle-mountain-range",
  "clap",
  "murmur-core",
+ "murmur-test-utils",
  "parity-scale-codec",
  "rand_chacha",
  "serde",
@@ -2542,7 +2543,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "w3f-bls",
- "zeroize",
 ]
 
 [[package]]
