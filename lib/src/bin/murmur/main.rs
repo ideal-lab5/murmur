@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#![allow(missing_docs)]
-use subxt::{backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig};
 use subxt_signer::sr25519::dev;
 use std::fs::File;
 use std::time::Instant;
 use clap::{Parser, Subcommand};
 use thiserror::Error;
-use etf::runtime_types::node_template_runtime::RuntimeCall::Balances;
+use sp_core::crypto::Ss58Codec;
 use murmur_lib::{
-    etf, create, prepare_execute, 
-    MurmurStore, BlockNumber
+    etf, 
+    etf::runtime_types::node_template_runtime::RuntimeCall::Balances,
+    create, 
+    prepare_execute,
+    idn_connect,
+    MurmurStore, 
+    BlockNumber,
 };
 
 /// Command line
@@ -46,20 +48,22 @@ enum Commands {
 
 #[derive(Parser)]
 struct WalletCreationDetails {
-    #[arg(long)]
+    #[arg(long, short)]
     name: String,
-    #[arg(long)]
+    #[arg(long, short)]
     seed: String,
-    #[clap(long)]
+    #[clap(long, short)]
     validity: u32
 }
 
 #[derive(Parser)]
 struct WalletExecuteDetails {
-    #[arg(long)]
+    #[arg(long, short)]
     name: String,
-    #[arg(long)]
+    #[arg(long, short)]
     seed: String,
+    #[arg(long, short)]
+    to: String,
     #[arg(short, long)]
     amount: String
 }
@@ -68,6 +72,16 @@ struct WalletExecuteDetails {
 pub enum CLIError {
     #[error("invalid public key")]
     InvalidPubkey,
+    #[error("invalid address")]
+    InvalidRecipient,
+    #[error("could not parse input to a u128")]
+    InvalidSendAmount,
+    #[error("something went wrong while creating the MMR")]
+    MurmurCreationFailed,
+    #[error("something went wrong while executing the MMR wallet")]
+    MurmurExecutionFailed,
+    #[error("the murmur store is corrupted or empty")]
+    CorruptedMurmurStore
 }
 
 /// the mmr_store file location
@@ -78,7 +92,6 @@ pub const MMR_STORE_FILEPATH: &str = "mmr_store";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let before = Instant::now();
-    // TODO: HKDF? just hash the seed?
     let ephem_msk = [1; 32];
 
     let (client, current_block_number, round_pubkey_bytes) = idn_connect().await?;
@@ -95,12 +108,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             // 2. create mmr
             let (call, mmr_store) = create(
-                args.name.clone(),
-                args.seed.clone(),
+                args.name.as_bytes().to_vec(),
+                args.seed.as_bytes().to_vec(),
                 ephem_msk,
                 schedule,
                 round_pubkey_bytes,
-            );
+            ).map_err(|_| CLIError::MurmurCreationFailed)?;
             // 3. add to storage
             write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
             // sign and send the call
@@ -113,28 +126,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Execute(args) => {
             // build balance transfer
-            let bob = dev::alice().public_key();
-            let v: u128 = args
-                .amount
+            let from_ss58 = sp_core::crypto::AccountId32::from_ss58check(&args.to)
+                .map_err(|_| CLIError::InvalidRecipient)?;
+
+            let bytes: &[u8] = from_ss58.as_ref();
+            let from_ss58_sized: [u8;32] = bytes.try_into()
+                .map_err(|_| CLIError::InvalidRecipient)?;
+            let to = subxt::utils::AccountId32::from(from_ss58_sized);
+            let v: u128 = args.amount
                 .split_whitespace()
-                .map(|r| r.replace('_', "").parse().unwrap())
-                .collect::<Vec<_>>()[0];
+                .map(|r| r.replace('_', "")
+                    .parse()
+                    .unwrap()
+            ).collect::<Vec<_>>()[0];
+                
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
-                dest: subxt::utils::MultiAddress::<_, u32>::from(bob),
+                dest: subxt::utils::MultiAddress::<_, u32>::from(to),
                 value: v,
             });
 
-            let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH);
+            let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH)?;
             let target_block_number: BlockNumber = current_block_number + 1;
+
             println!("💾 Recovered Murmur store from local file");
             let tx = prepare_execute(
-                args.name.clone().as_bytes().to_vec(),
-                args.seed.clone().as_bytes().to_vec(),
+                args.name.as_bytes().to_vec(),
+                args.seed.as_bytes().to_vec(),
                 target_block_number,
                 store,
                 balance_transfer_call,
-            )
-            .await;
+            ).map_err(|_| CLIError::MurmurExecutionFailed)?;
             // submit the tx using alice to sign it
             let _result = client.tx()
                 .sign_and_submit_then_watch_default(&tx, &dev::alice())
@@ -145,39 +166,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// async connection to the Ideal Network
-/// if successful then fetch data
-/// else error if unreachable
-async fn idn_connect() -> 
-    Result<(OnlineClient<SubstrateConfig>, BlockNumber, Vec<u8>), Box<dyn std::error::Error>> {
-    println!("🎲 Connecting to Ideal network (local node)");
-    let rpc_client = RpcClient::from_url("ws://localhost:9944").await?;
-    let client = OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
-    println!("🔗 RPC Client: connection established");
-
-    // fetch the round public key from etf runtime storage
-    let round_key_query = subxt::dynamic::storage("Etf", "RoundPublic", ());
-    let result = client
-        .storage()
-        .at_latest()
-        .await?
-        .fetch(&round_key_query)
-        .await?;
-    let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
-
-    println!("🔑 Successfully retrieved the round public key.");
-
-    let current_block = client.blocks().at_latest().await?;
-    let current_block_number: BlockNumber = current_block.header().number;
-    println!("🧊 Current block number: #{:?}", current_block_number);
-    Ok((client, current_block_number, round_pubkey_bytes))
-}
-
 /// read an MMR from a file
-fn load_mmr_store(path: &str) -> MurmurStore {
+fn load_mmr_store(path: &str) -> Result<MurmurStore, CLIError> {
     let mmr_store_file = File::open(path).expect("Unable to open file");
-    let data: MurmurStore = serde_cbor::from_reader(mmr_store_file).unwrap();
-    data
+    let data: MurmurStore = serde_cbor::from_reader(mmr_store_file)
+        .map_err(|_| CLIError::CorruptedMurmurStore)?;
+    Ok(data)
 }
 
 /// Write the MMR data to a file
