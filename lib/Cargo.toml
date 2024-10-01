@@ -36,3 +36,4 @@ ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
 w3f-bls = "0.1.3"
 murmur-core = { package = "murmur-core", path = "../core/", features = ["client"] }
+zeroize = { version = "1.8.1", default-features = false }

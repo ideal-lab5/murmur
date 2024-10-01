@@ -411,7 +411,6 @@ mod tests {
         ));
     }
 
-    // #[cfg(feature = "client")]
     #[test]
     pub fn it_fails_on_verify_bad_proof() {
         let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
