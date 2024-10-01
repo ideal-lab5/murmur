@@ -16,10 +16,7 @@ workspace = true
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-totp-rs = { version = "5.5.1", default-features = false, optional = true }
-getrandom = { version = "0.2", features = ["js"], default-features = false, optional = true }
-rand_core = { version = "0.6.4", features = ["getrandom"], default-features = false, optional = true }
-
+rand_core = { version = "0.6.4", features = ["getrandom"], default-features = false }
 codec = { package = "parity-scale-codec", version = "3.6.12", features = ["derive"], default-features = false }
 etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "tony/dev", default-features = false} 
 ckb-merkle-mountain-range = { version = "0.5.2", default-features = false }

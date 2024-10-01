@@ -5,6 +5,9 @@ edition = "2021"
 authors.workspace = true
 license.workspace = true
 
+# [[bin]]
+# name = "murmur"
+
 [dependencies]
 subxt = "0.35.2"
 subxt-signer = "0.35.2"

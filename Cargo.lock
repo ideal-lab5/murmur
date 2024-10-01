@@ -2629,15 +2629,12 @@ name = "murmur-core"
 version = "0.1.0"
 dependencies = [
  "ark-bls12-377",
- "ark-ff",
  "ark-serialize",
  "ark-std",
- "array-bytes",
  "ckb-merkle-mountain-range",
  "etf-crypto-primitives 0.2.4 (git+https://github.com/ideal-lab5/etf-sdk/?branch=dev)",
- "getrandom",
- "hex",
  "parity-scale-codec",
+ "rand_chacha",
  "rand_core",
  "serde",
  "sha3",
@@ -2651,8 +2648,10 @@ name = "murmur-lib"
 version = "0.1.0"
 dependencies = [
  "murmur-core",
+ "murmur-test-utils",
  "sp-consensus-beefy-etf 13.0.0 (git+https://github.com/ideal-lab5/pallets.git?branch=main)",
  "subxt",
+ "subxt-signer",
  "w3f-bls",
 ]
 
@@ -2667,14 +2666,12 @@ dependencies = [
  "array-bytes",
  "ckb-merkle-mountain-range",
  "etf-crypto-primitives 0.2.4 (git+https://github.com/ideal-lab5/etf-sdk/?branch=tony/dev)",
- "getrandom",
  "hex",
  "murmur-core",
  "parity-scale-codec",
  "rand_core",
  "serde",
  "sha3",
- "totp-rs",
  "w3f-bls",
 ]
 

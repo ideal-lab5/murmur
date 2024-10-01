@@ -9,7 +9,7 @@ It allows for the creation and exeuction of ephemeral 'murmur' wallets on the Id
 Install the cli with
 
 ``` shell
-cargo install murmur
+cargo install murmur-cli
 # verify it works
 murmur --help
 ```
@@ -28,14 +28,14 @@ To setup a dev environment:
 
 ``` shell
 # generate a wallet valid for the next 1000 blocks
-./target/debug/murmur-cli new --name test --seed my_secret_key --validity 1000
+./target/debug/murmur-cli new --name test --seed my_secret_key --validity 100
 ```
 
 ##### Execute a balance transfer
 
 ``` shell
-# send a balance transfer now
-./target/debug/murmur-cli execute --name test --seed my_secret_key --amount 100
+# send a balance transfer
+./target/debug/murmur-cli execute --name test --seed my_secret_key --to CuqfkE3QieYPAWPpwiygDufmyrKecDcVCF7PN1psaLEn8yr --amount 100
 ```
 
 ## Test

@@ -71,6 +71,14 @@ struct WalletExecuteDetails {
 pub enum CLIError {
     #[error("invalid public key")]
     InvalidPubkey,
+    #[error("invalid address")]
+    InvalidRecipient,
+    #[error("could not parse input to a u128")]
+    InvalidSendAmount,
+    #[error("something went wrong while creating the MMR")]
+    MurmurCreationFailed,
+    #[error("something went wrong while executing the MMR wallet")]
+    MurmurExecutionFailed,
 }
 
 /// the mmr_store file location
@@ -97,12 +105,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             // 2. create mmr
             let (call, mmr_store) = create(
-                args.name.clone(),
-                args.seed.clone(),
+                args.name.as_bytes().to_vec(),
+                args.seed.as_bytes().to_vec(),
                 ephem_msk,
                 schedule,
                 round_pubkey_bytes,
-            );
+            ).map_err(|_| CLIError::MurmurCreationFailed)?;
             // 3. add to storage
             write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
             // sign and send the call
@@ -115,19 +123,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Execute(args) => {
             // build balance transfer
-            // let bob = dev::alice().public_key();
-            // let to_bytes: [u8; 32] = args.to.as_bytes().to_vec().try_into().unwrap();
             let from_ss58 = sp_core::crypto::AccountId32::from_ss58check(&args.to)
-                .unwrap();
+                .map_err(|_| CLIError::InvalidRecipient)?;
 
             let bytes: &[u8] = from_ss58.as_ref();
-            let from_ss58_sized: [u8;32] = bytes.try_into().unwrap();
+            let from_ss58_sized: [u8;32] = bytes.try_into()
+                .map_err(|_| CLIError::InvalidRecipient)?;
             let to = subxt::utils::AccountId32::from(from_ss58_sized);
-            let v: u128 = args
-                .amount
+            let v: u128 = args.amount
                 .split_whitespace()
-                .map(|r| r.replace('_', "").parse().unwrap())
-                .collect::<Vec<_>>()[0];
+                .map(|r| r.replace('_', "")
+                    .parse()
+                    .unwrap()
+            ).collect::<Vec<_>>()[0];
+                
+
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
                 dest: subxt::utils::MultiAddress::<_, u32>::from(to),
                 value: v,
@@ -135,15 +145,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH);
             let target_block_number: BlockNumber = current_block_number + 1;
+
             println!("💾 Recovered Murmur store from local file");
             let tx = prepare_execute(
-                args.name.clone().as_bytes().to_vec(),
-                args.seed.clone().as_bytes().to_vec(),
+                args.name.as_bytes().to_vec(),
+                args.seed.as_bytes().to_vec(),
                 target_block_number,
                 store,
                 balance_transfer_call,
-            )
-            .await;
+            ).map_err(|_| CLIError::MurmurExecutionFailed)?;
+
             // submit the tx using alice to sign it
             let _result = client.tx()
                 .sign_and_submit_then_watch_default(&tx, &dev::alice())
