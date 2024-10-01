@@ -93,14 +93,14 @@ pub fn create(
 /// * `call`: Any valid runtime call
 ///
 pub async fn prepare_execute(
-    name: Vec<u8>,
-    seed: Vec<u8>,
+    name: String,
+    seed: String,
     when: BlockNumber,
     store: MurmurStore,
     call: RuntimeCall,
 ) -> TxPayload<Proxy> {
     let (proof, commitment, ciphertext, pos) =
-        store.execute(seed.clone(), when, call.encode()).unwrap();
+        store.execute(seed.clone().into(), when, call.encode()).unwrap();
     let size: u64 = proof.mmr_size();
     let proof_items: Vec<Vec<u8>> = proof
         .proof_items()
@@ -109,7 +109,7 @@ pub async fn prepare_execute(
         .collect::<Vec<_>>();
 
     etf::tx().murmur().proxy(
-        BoundedVec(name),
+        BoundedVec(name.into()),
         pos,
         commitment,
         ciphertext,

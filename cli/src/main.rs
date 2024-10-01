@@ -114,9 +114,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("✅ MMR proxy account creation successful!");
         }
         Commands::Execute(args) => {
-            // build balance transfer
-            // let bob = dev::alice().public_key();
-            // let to_bytes: [u8; 32] = args.to.as_bytes().to_vec().try_into().unwrap();
             let from_ss58 = sp_core::crypto::AccountId32::from_ss58check(&args.to)
                 .unwrap();
 
@@ -137,8 +134,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let target_block_number: BlockNumber = current_block_number + 1;
             println!("💾 Recovered Murmur store from local file");
             let tx = prepare_execute(
-                args.name.clone().as_bytes().to_vec(),
-                args.seed.clone().as_bytes().to_vec(),
+                args.name.clone(),
+                args.seed.clone(),
                 target_block_number,
                 store,
                 balance_transfer_call,
