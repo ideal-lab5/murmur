@@ -114,7 +114,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 schedule,
                 round_pubkey_bytes,
             ).map_err(|_| CLIError::MurmurCreationFailed)?;
-            args.zeroize();
             // 3. add to storage
             write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
             // sign and send the call
@@ -157,7 +156,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 store,
                 balance_transfer_call,
             ).map_err(|_| CLIError::MurmurExecutionFailed)?;
-            args.zeroize();
             // submit the tx using alice to sign it
             let _result = client.tx()
                 .sign_and_submit_then_watch_default(&tx, &dev::alice())
