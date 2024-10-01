@@ -30,7 +30,7 @@ use subxt::{
     config::SubstrateConfig, 
     ext::codec::Encode,
 };
-
+use zeroize::Zeroize;
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 
 // Generate an interface that we can use from the node's metadata.
@@ -62,8 +62,8 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
 ///
 pub fn create(
     name: Vec<u8>,
-    seed: Vec<u8>,
-    ephem_msk: [u8; 32],
+    mut seed: Vec<u8>,
+    mut ephem_msk: [u8; 32],
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
 ) -> Result<(subxt::tx::Payload<Create>, MurmurStore), Error> {
@@ -75,6 +75,8 @@ pub fn create(
         ephem_msk,
         round_pubkey,
     )?;
+    ephem_msk.zeroize();
+    seed.zeroize();
     let root = mmr_store.root.clone();
 
     let call = etf::tx()
@@ -101,12 +103,13 @@ pub fn create(
 ///
 pub fn prepare_execute(
     name: Vec<u8>,
-    seed: Vec<u8>,
+    mut seed: Vec<u8>,
     when: BlockNumber,
     store: MurmurStore,
     call: RuntimeCall,
 ) -> Result<subxt::tx::Payload<Proxy>, Error> {
     let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
+    seed.zeroize();
     let size = proof.mmr_size();
     let proof_items: Vec<Vec<u8>> = proof
         .proof_items()
