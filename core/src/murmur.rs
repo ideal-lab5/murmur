@@ -21,9 +21,6 @@ use alloc::{collections::BTreeMap, vec, vec::Vec};
 #[cfg(feature = "client")]
 use crate::otp::BOTPGenerator;
 
-// #[cfg(feature = "client")]
-// use rand_core::OsRng;
-
 use rand_chacha::ChaCha20Rng;
 use ark_std::rand::SeedableRng;
 use ark_std::rand::{CryptoRng, Rng};
