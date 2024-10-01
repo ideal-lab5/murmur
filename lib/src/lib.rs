@@ -24,7 +24,12 @@ pub use murmur_core::{
     murmur::{Error, MurmurStore},
     types::BlockNumber,
 };
-use subxt::ext::codec::Encode;
+use subxt::{
+    backend::rpc::RpcClient, 
+    client::OnlineClient, 
+    config::SubstrateConfig, 
+    ext::codec::Encode,
+};
 
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 
@@ -65,7 +70,7 @@ pub fn create(
     let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
         .map_err(|_| Error::InvalidPubkey)?;
     let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
-        seed.clone().into(),
+        seed.clone(),
         block_schedule.clone(),
         ephem_msk,
         round_pubkey,
@@ -101,8 +106,7 @@ pub fn prepare_execute(
     store: MurmurStore,
     call: RuntimeCall,
 ) -> Result<subxt::tx::Payload<Proxy>, Error> {
-    let (proof, commitment, ciphertext, pos) = 
-        store.execute(seed.clone(), when, call.encode())?;
+    let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
     let size = proof.mmr_size();
     let proof_items: Vec<Vec<u8>> = proof
         .proof_items()
@@ -119,6 +123,43 @@ pub fn prepare_execute(
         size,
         call,
     ))
+}
+
+/// Async connection to the Ideal Network
+/// if successful then fetch data
+/// else error if unreachable
+pub async fn idn_connect(
+) -> Result<(OnlineClient<SubstrateConfig>, BlockNumber, Vec<u8>), Box<dyn std::error::Error>> {
+    println!("🎲 Connecting to Ideal network (local node)");
+    let ws_url = std::env::var("WS_URL").unwrap_or_else(|_| {
+        let fallback_url = "ws://localhost:9944".to_string();
+        println!(
+            "⚠️ WS_URL environment variable not set. Using fallback URL: {}",
+            fallback_url
+        );
+        fallback_url
+    });
+
+    let rpc_client = RpcClient::from_url(&ws_url).await?;
+    let client = OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
+    println!("🔗 RPC Client: connection established");
+
+    // fetch the round public key from etf runtime storage
+    let round_key_query = subxt::dynamic::storage("Etf", "RoundPublic", ());
+    let result = client
+        .storage()
+        .at_latest()
+        .await?
+        .fetch(&round_key_query)
+        .await?;
+    let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
+
+    println!("🔑 Successfully retrieved the round public key.");
+
+    let current_block = client.blocks().at_latest().await?;
+    let current_block_number: BlockNumber = current_block.header().number;
+    println!("🧊 Current block number: #{:?}", current_block_number);
+    Ok((client, current_block_number, round_pubkey_bytes))
 }
 
 #[cfg(test)]
