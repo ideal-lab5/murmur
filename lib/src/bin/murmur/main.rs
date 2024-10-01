@@ -82,6 +82,8 @@ pub enum CLIError {
     MurmurCreationFailed,
     #[error("something went wrong while executing the MMR wallet")]
     MurmurExecutionFailed,
+    #[error("the murmur store is corrupted or empty")]
+    CorruptedMurmurStore
 }
 
 /// the mmr_store file location
@@ -140,13 +142,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .unwrap()
             ).collect::<Vec<_>>()[0];
                 
-
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
                 dest: subxt::utils::MultiAddress::<_, u32>::from(to),
                 value: v,
             });
 
-            let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH);
+            let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH)?;
             let target_block_number: BlockNumber = current_block_number + 1;
 
             println!("💾 Recovered Murmur store from local file");
@@ -197,10 +198,11 @@ async fn idn_connect() ->
 }
 
 /// read an MMR from a file
-fn load_mmr_store(path: &str) -> MurmurStore {
+fn load_mmr_store(path: &str) -> Result<MurmurStore, CLIError> {
     let mmr_store_file = File::open(path).expect("Unable to open file");
-    let data: MurmurStore = serde_cbor::from_reader(mmr_store_file).unwrap();
-    data
+    let data: MurmurStore = serde_cbor::from_reader(mmr_store_file)
+        .map_err(|_| CLIError::CorruptedMurmurStore)?;
+    Ok(data)
 }
 
 /// Write the MMR data to a file

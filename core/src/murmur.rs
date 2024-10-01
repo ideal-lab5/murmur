@@ -57,6 +57,8 @@ pub enum Error {
     InvalidBufferSize,
     /// The seed was invalid 
     InvalidSeed,
+    /// The public key was invalid (could not be decoded)
+    InvalidPubkey,
 }
 
 /// The murmur store contains minimal data required to use a murmur wallet
