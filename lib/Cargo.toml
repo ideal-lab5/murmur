@@ -12,7 +12,7 @@ crate-type = [
 ]
 
 [[bin]]
-name = "murmur-cli"
+name = "murmur"
 
 [dependencies]
 subxt = "0.35.2"

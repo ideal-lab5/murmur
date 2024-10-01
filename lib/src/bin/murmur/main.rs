@@ -64,8 +64,8 @@ struct WalletExecuteDetails {
     seed: String,
     #[arg(long, short)]
     to: String,
-    #[arg(short, long)]
-    amount: String
+    #[arg(short, long, value_parser = clap::value_parser!(u128))]
+    amount: u128
 }
 
 #[derive(Error, Debug)]
@@ -133,16 +133,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let from_ss58_sized: [u8;32] = bytes.try_into()
                 .map_err(|_| CLIError::InvalidRecipient)?;
             let to = subxt::utils::AccountId32::from(from_ss58_sized);
-            let v: u128 = args.amount
-                .split_whitespace()
-                .map(|r| r.replace('_', "")
-                    .parse()
-                    .unwrap()
-            ).collect::<Vec<_>>()[0];
                 
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
                 dest: subxt::utils::MultiAddress::<_, u32>::from(to),
-                value: v,
+                value: args.amount,
             });
 
             let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH)?;
