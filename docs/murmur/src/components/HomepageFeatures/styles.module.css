@@ -1,0 +1,77 @@
+.features {
+  display: flex;
+  align-items: center;
+  padding: 2rem 0;
+  width: 100%;
+}
+
+.featureSvg {
+  height: 200px;
+  width: 200px;
+}
+
+/* General Layout */
+body {
+  background-color: #1f2937; /* Dark, slightly blue-tinted background */
+  color: #e0e0e0; /* Light text */
+  font-family: 'Inter', sans-serif; /* Modern font */
+}
+
+/* Links */
+a {
+  color: #61dafb; /* Neon blue for links */
+  text-decoration: none;
+  border-bottom: 2px solid #61dafb; /* Sharp underline in blue */
+}
+
+a:hover {
+  color: #76e4fb; /* Brighter blue on hover */
+  border-bottom: 2px solid #76e4fb;
+}
+
+/* Headers */
+h1, h2, h3, h4, h5, h6 {
+  color: #ffffff; /* Bright white for headers */
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+/* Code Blocks */
+pre {
+  background-color: #282c34; /* Dark code background */
+  color: #f8f8f2; /* Light text in code blocks */
+  border-left: 4px solid #61dafb; /* Blue border for code blocks */
+  padding: 16px;
+  border-radius: 5px;
+}
+
+/* Buttons */
+button {
+  background-color: #61dafb; /* Bright blue button */
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 10px 20px;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #76e4fb; /* Brighter blue on hover */
+}
+
+/* Hover Effect for Links */
+a {
+  position: relative;
+  transition: color 0.3s ease, border-bottom 0.3s ease;
+}
+
+a:hover {
+  border-bottom-width: 3px;
+}
+
+/* Button Hover Effect */
+button:hover {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
