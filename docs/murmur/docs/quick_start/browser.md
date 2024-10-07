@@ -4,7 +4,9 @@ sidebar_position: 3
 
 # Browser Integration
 
-Murmur can be easily integrate into web applications with **murmur.js**, a javascript wrapper that allows you to communicate with the `murmur-api` (TODO link to the api?).
+Murmur can be easily integrate into web applications with **murmur.js**, a javascript wrapper that allows you to communicate with the `murmur-api`.
+
+> This is a WIP and subject to major changes.
 
 ## Integrate Murmur
 
@@ -27,7 +29,9 @@ The validity period specifies the duration (from creation) for which the wallet 
 
 ``` js
 let validity = 500
-murmur.new(validity)
+murmur.new(validity).then(() => {
+    // handle result
+})
 ```
 
 ## Update a Wallet 
@@ -35,7 +39,9 @@ murmur.new(validity)
 Coming soon, will be something like this:
 ``` js
 let validity = 500
-murmur.update(validity)
+murmur.update(validity).then(result => {
+    // do stuff
+})
 ```
 
 ## Execute a Murmur Wallet
@@ -43,7 +49,9 @@ murmur.update(validity)
 ``` js
 // use polkadotjs to construct some call
 let call = prepareCall(api)
-murmur.execute(call)
+murmur.execute(call).then(result => {
+
+})
 ```
 
 ## Query Murmur wallets
@@ -51,5 +59,7 @@ murmur.execute(call)
 Use the polkadotjs api to query the chain state:
 ``` js
 let name = 'some_name';
-let maybeWallet = await api.query.murmur.registry(name);
+murmur.inspect(name).then(result => {
+    console.log(result)
+})
 ```

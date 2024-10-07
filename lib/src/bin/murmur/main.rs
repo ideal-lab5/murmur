@@ -195,12 +195,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // println!("{:?}", blake2_hash);
             // let who = BoundedVec(blake2_hash.0.to_vec());
             // let who = BoundedVec(args.name.as_bytes().to_vec());
-            let who = BoundedVec::<u8, ConstU32<32>>::truncate_from(args.name.as_bytes().to_vec());
-            println!("{:?}", who);
-            let query = etf::storage().murmur().registry(&who.into());
-            println!("{:?}", query);
-            let result = client.storage().at_latest().await?.fetch(&query).await?;
-            println!("result {:?}", result);
+            // let who = BoundedVec::<u8, ConstU32<32>>::truncate_from(args.name.as_bytes().to_vec());
+            // println!("{:?}", who);
+            // let query = etf::storage().murmur().registry(&who.into());
+            // println!("{:?}", query);
+            // let result = client.storage().at_latest().await?.fetch(&query).await?;
+            // println!("result {:?}", result);
         }
     }
     println!("Elapsed time: {:.2?}", before.elapsed());

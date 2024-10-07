@@ -15,14 +15,15 @@
  */
 
 use beefy::{known_payloads, Commitment, Payload};
-use etf::murmur::calls::types::{Create, Proxy};
-use etf::runtime_types::node_template_runtime::RuntimeCall;
+pub use etf::murmur::calls::types::{Create, Proxy};
+pub use etf::runtime_types::node_template_runtime::RuntimeCall;
 pub use etf::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 use murmur_core::types::{Identity, IdentityBuilder};
 pub use murmur_core::{
     murmur::{Error, MurmurStore},
     types::BlockNumber,
 };
+pub use subxt::tx::Payload as TxPayload;
 use subxt::{
     backend::rpc::RpcClient, 
     client::OnlineClient, 
@@ -65,7 +66,7 @@ pub fn create(
     ephem_msk: [u8; 32],
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
-) -> Result<(subxt::tx::Payload<Create>, MurmurStore), Error> {
+) -> Result<(TxPayload<Create>, MurmurStore), Error> {
     let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
         .map_err(|_| Error::InvalidPubkey)?;
     let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
@@ -104,7 +105,7 @@ pub fn prepare_execute(
     when: BlockNumber,
     store: MurmurStore,
     call: RuntimeCall,
-) -> Result<subxt::tx::Payload<Proxy>, Error> {
+) -> Result<TxPayload<Proxy>, Error> {
     let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
     let size = proof.mmr_size();
     let proof_items: Vec<Vec<u8>> = proof
