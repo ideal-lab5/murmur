@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use subxt_signer::sr25519::dev;
+use clap::{Parser, Subcommand};
+use murmur_lib::{
+    create, etf, etf::runtime_types::node_template_runtime::RuntimeCall::Balances, idn_connect,
+    prepare_execute, BlockNumber, MurmurStore,
+};
+use sp_core::crypto::Ss58Codec;
 use std::fs::File;
 use std::time::Instant;
-use clap::{Parser, Subcommand};
+use subxt_core::config::Hasher;
+use subxt_signer::sr25519::dev;
 use thiserror::Error;
-use sp_core::crypto::Ss58Codec;
-use murmur_lib::{
-    etf, 
-    etf::runtime_types::node_template_runtime::RuntimeCall::Balances,
-    create, 
-    prepare_execute,
-    idn_connect,
-    MurmurStore, 
-    BlockNumber,
+
+
+use frame_support::{
+    BoundedVec,
+    traits::ConstU32,
 };
 
 /// Command line
@@ -44,6 +46,7 @@ enum Commands {
     New(WalletCreationDetails),
     /// dispatch (proxy) a call to a murmur wallet
     Execute(WalletExecuteDetails),
+    Inspect(WalletInspectDetails),
 }
 
 #[derive(Parser)]
@@ -53,7 +56,7 @@ struct WalletCreationDetails {
     #[arg(long, short)]
     seed: String,
     #[clap(long, short)]
-    validity: u32
+    validity: u32,
 }
 
 #[derive(Parser)]
@@ -65,7 +68,13 @@ struct WalletExecuteDetails {
     #[arg(long, short)]
     to: String,
     #[arg(short, long)]
-    amount: String
+    amount: String,
+}
+
+#[derive(Parser)]
+struct WalletInspectDetails {
+    #[arg(long, short)]
+    name: String,
 }
 
 #[derive(Error, Debug)]
@@ -81,7 +90,7 @@ pub enum CLIError {
     #[error("something went wrong while executing the MMR wallet")]
     MurmurExecutionFailed,
     #[error("the murmur store is corrupted or empty")]
-    CorruptedMurmurStore
+    CorruptedMurmurStore,
 }
 
 /// the mmr_store file location
@@ -113,7 +122,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ephem_msk,
                 schedule,
                 round_pubkey_bytes,
-            ).map_err(|_| CLIError::MurmurCreationFailed)?;
+            )
+            .map_err(|_| CLIError::MurmurCreationFailed)?;
             // 3. add to storage
             write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
             // sign and send the call
@@ -130,16 +140,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|_| CLIError::InvalidRecipient)?;
 
             let bytes: &[u8] = from_ss58.as_ref();
-            let from_ss58_sized: [u8;32] = bytes.try_into()
-                .map_err(|_| CLIError::InvalidRecipient)?;
+            let from_ss58_sized: [u8; 32] =
+                bytes.try_into().map_err(|_| CLIError::InvalidRecipient)?;
             let to = subxt::utils::AccountId32::from(from_ss58_sized);
-            let v: u128 = args.amount
+            let v: u128 = args
+                .amount
                 .split_whitespace()
-                .map(|r| r.replace('_', "")
-                    .parse()
-                    .unwrap()
-            ).collect::<Vec<_>>()[0];
-                
+                .map(|r| r.replace('_', "").parse().unwrap())
+                .collect::<Vec<_>>()[0];
+
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
                 dest: subxt::utils::MultiAddress::<_, u32>::from(to),
                 value: v,
@@ -155,12 +164,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 target_block_number,
                 store,
                 balance_transfer_call,
-            ).map_err(|_| CLIError::MurmurExecutionFailed)?;
+            )
+            .map_err(|_| CLIError::MurmurExecutionFailed)?;
             // submit the tx using alice to sign it
-            let _result = client.tx()
+            let _result = client
+                .tx()
                 .sign_and_submit_then_watch_default(&tx, &dev::alice())
                 .await;
-        },
+        }
+        Commands::Inspect(args) => {
+            // Build a storage query to access account information.
+            let account = dev::alice().public_key().into();
+            let storage_query = etf::storage().system().account(&account);
+            println!("{:?}", storage_query);
+
+            // // Use that query to `fetch` a result. This returns an `Option<_>`, which will be
+            // // `None` if no value exists at the given address. You can also use `fetch_default`
+            // // where applicable, which will return the default value if none exists.
+            // let result = client
+            //     .storage()
+            //     .at_latest()
+            //     .await?
+            //     .fetch(&storage_query)
+            //     .await?;
+
+            // let v = result.unwrap().data.free;
+            // println!("Alice: {v}");
+            // let blake2_hash =
+            //     subxt_core::config::substrate::BlakeTwo256::hash_of(&args.name.as_bytes().to_vec());
+            // println!("{:?}", blake2_hash);
+            // let who = BoundedVec(blake2_hash.0.to_vec());
+            // let who = BoundedVec(args.name.as_bytes().to_vec());
+            let who = BoundedVec::<u8, ConstU32<32>>::truncate_from(args.name.as_bytes().to_vec());
+            println!("{:?}", who);
+            let query = etf::storage().murmur().registry(&who.into());
+            println!("{:?}", query);
+            let result = client.storage().at_latest().await?.fetch(&query).await?;
+            println!("result {:?}", result);
+        }
     }
     println!("Elapsed time: {:.2?}", before.elapsed());
     Ok(())
@@ -169,8 +210,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// read an MMR from a file
 fn load_mmr_store(path: &str) -> Result<MurmurStore, CLIError> {
     let mmr_store_file = File::open(path).expect("Unable to open file");
-    let data: MurmurStore = serde_cbor::from_reader(mmr_store_file)
-        .map_err(|_| CLIError::CorruptedMurmurStore)?;
+    let data: MurmurStore =
+        serde_cbor::from_reader(mmr_store_file).map_err(|_| CLIError::CorruptedMurmurStore)?;
     Ok(data)
 }
 

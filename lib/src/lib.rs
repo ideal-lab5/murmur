@@ -16,9 +16,8 @@
 
 use beefy::{known_payloads, Commitment, Payload};
 use etf::murmur::calls::types::{Create, Proxy};
-use etf::runtime_types::{
-    bounded_collections::bounded_vec::BoundedVec, node_template_runtime::RuntimeCall,
-};
+use etf::runtime_types::node_template_runtime::RuntimeCall;
+pub use etf::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 use murmur_core::types::{Identity, IdentityBuilder};
 pub use murmur_core::{
     murmur::{Error, MurmurStore},

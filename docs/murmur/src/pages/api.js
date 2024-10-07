@@ -10,7 +10,9 @@ export default function Api() {
       title="murmur-api docs"
       description="Murmur API documentation">
       <main>
-        
+        {/* <span>
+          curl --cookie-jar cookies -H "Content-Type: application/json" -d '{"username": "test", "password": "test"}' http://localhost:8000/authenticate
+        </span> */}
       </main>
     </Layout>
   );
