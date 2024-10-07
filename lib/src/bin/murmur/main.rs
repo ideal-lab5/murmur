@@ -13,21 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use subxt_signer::sr25519::dev;
+use clap::{Parser, Subcommand};
+use murmur_lib::{
+    create,
+    etf::{self, runtime_types::node_template_runtime::RuntimeCall::Balances},
+    idn_connect, prepare_execute, BlockNumber, MurmurStore,
+};
+use sp_core::crypto::Ss58Codec;
 use std::fs::File;
 use std::time::Instant;
-use clap::{Parser, Subcommand};
+use subxt_signer::sr25519::dev;
 use thiserror::Error;
-use sp_core::crypto::Ss58Codec;
-use murmur_lib::{
-    etf, 
-    etf::runtime_types::node_template_runtime::RuntimeCall::Balances,
-    create, 
-    prepare_execute,
-    idn_connect,
-    MurmurStore, 
-    BlockNumber,
-};
 
 /// Command line
 #[derive(Parser)]
@@ -53,7 +49,7 @@ struct WalletCreationDetails {
     #[arg(long, short)]
     seed: String,
     #[clap(long, short)]
-    validity: u32
+    validity: u32,
 }
 
 #[derive(Parser)]
@@ -65,7 +61,7 @@ struct WalletExecuteDetails {
     #[arg(long, short)]
     to: String,
     #[arg(short, long, value_parser = clap::value_parser!(u128))]
-    amount: u128
+    amount: u128,
 }
 
 #[derive(Error, Debug)]
@@ -81,7 +77,7 @@ pub enum CLIError {
     #[error("something went wrong while executing the MMR wallet")]
     MurmurExecutionFailed,
     #[error("the murmur store is corrupted or empty")]
-    CorruptedMurmurStore
+    CorruptedMurmurStore,
 }
 
 /// the mmr_store file location
@@ -113,7 +109,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ephem_msk,
                 schedule,
                 round_pubkey_bytes,
-            ).map_err(|_| CLIError::MurmurCreationFailed)?;
+            )
+            .map_err(|_| CLIError::MurmurCreationFailed)?;
             // 3. add to storage
             write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
             // sign and send the call
@@ -130,10 +127,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|_| CLIError::InvalidRecipient)?;
 
             let bytes: &[u8] = from_ss58.as_ref();
-            let from_ss58_sized: [u8;32] = bytes.try_into()
-                .map_err(|_| CLIError::InvalidRecipient)?;
+            let from_ss58_sized: [u8; 32] =
+                bytes.try_into().map_err(|_| CLIError::InvalidRecipient)?;
             let to = subxt::utils::AccountId32::from(from_ss58_sized);
-                
+
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
                 dest: subxt::utils::MultiAddress::<_, u32>::from(to),
                 value: args.amount,
@@ -149,12 +146,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 target_block_number,
                 store,
                 balance_transfer_call,
-            ).map_err(|_| CLIError::MurmurExecutionFailed)?;
+            )
+            .map_err(|_| CLIError::MurmurExecutionFailed)?;
             // submit the tx using alice to sign it
-            let _result = client.tx()
+            let _result = client
+                .tx()
                 .sign_and_submit_then_watch_default(&tx, &dev::alice())
                 .await;
-        },
+        }
     }
     println!("Elapsed time: {:.2?}", before.elapsed());
     Ok(())
@@ -163,8 +162,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// read an MMR from a file
 fn load_mmr_store(path: &str) -> Result<MurmurStore, CLIError> {
     let mmr_store_file = File::open(path).expect("Unable to open file");
-    let data: MurmurStore = serde_cbor::from_reader(mmr_store_file)
-        .map_err(|_| CLIError::CorruptedMurmurStore)?;
+    let data: MurmurStore =
+        serde_cbor::from_reader(mmr_store_file).map_err(|_| CLIError::CorruptedMurmurStore)?;
     Ok(data)
 }
 
