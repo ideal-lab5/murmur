@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-use beefy::{known_payloads, Commitment, Payload};
-use etf::murmur::calls::types::{Create, Proxy};
-use etf::runtime_types::{
-    bounded_collections::bounded_vec::BoundedVec, node_template_runtime::RuntimeCall,
-};
+use etf::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 use murmur_core::types::{Identity, IdentityBuilder};
+use subxt::{
+    backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig, ext::codec::Encode,
+};
+use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
+use zeroize::Zeroize;
+
+pub use beefy::{known_payloads, Commitment, Payload};
+pub use etf::{
+    murmur::calls::types::{Create, Proxy},
+    runtime_types::node_template_runtime::RuntimeCall,
+};
 pub use murmur_core::{
     murmur::{Error, MurmurStore},
     types::BlockNumber,
 };
-use subxt::{
-    backend::rpc::RpcClient, 
-    client::OnlineClient, 
-    config::SubstrateConfig, 
-    ext::codec::Encode,
-};
-use zeroize::Zeroize;
-use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
+pub use subxt::tx::Payload as TxPayload;
 
 // Generate an interface that we can use from the node's metadata.
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
@@ -66,7 +66,7 @@ pub fn create(
     mut ephem_msk: [u8; 32],
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
-) -> Result<(subxt::tx::Payload<Create>, MurmurStore), Error> {
+) -> Result<(TxPayload<Create>, MurmurStore), Error> {
     let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
         .map_err(|_| Error::InvalidPubkey)?;
     let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
@@ -107,7 +107,7 @@ pub fn prepare_execute(
     when: BlockNumber,
     store: MurmurStore,
     call: RuntimeCall,
-) -> Result<subxt::tx::Payload<Proxy>, Error> {
+) -> Result<TxPayload<Proxy>, Error> {
     let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
     seed.zeroize();
     let size = proof.mmr_size();
@@ -210,7 +210,7 @@ mod tests {
         let ephem_msk = [1; 32];
         let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
         let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-        let (call, mmr_store) = create(
+        let (_call, mmr_store) = create(
             name.clone(),
             seed.clone(),
             ephem_msk,
@@ -246,7 +246,7 @@ mod tests {
         )
         .unwrap();
 
-        let (proof, commitment, ciphertext, pos) = mmr_store
+        let (proof, commitment, ciphertext, _pos) = mmr_store
             .execute(seed.clone(), 1, balance_transfer_call_2.encode())
             .unwrap();
 
