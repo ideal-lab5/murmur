@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use etf::runtime_types::bounded_collections::bounded_vec::BoundedVec;
+use beefy::{known_payloads, Commitment, Payload};
 use murmur_core::types::{Identity, IdentityBuilder};
 use subxt::{
     backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig, ext::codec::Encode,
@@ -22,16 +22,14 @@ use subxt::{
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 use zeroize::Zeroize;
 
-pub use beefy::{known_payloads, Commitment, Payload};
-pub use etf::{
-    murmur::calls::types::{Create, Proxy},
-    runtime_types::node_template_runtime::RuntimeCall,
+pub use etf::runtime_types::{
+    bounded_collections::bounded_vec::BoundedVec,
+    node_template_runtime::RuntimeCall,
 };
 pub use murmur_core::{
     murmur::{Error, MurmurStore},
     types::BlockNumber,
 };
-pub use subxt::tx::Payload as TxPayload;
 
 // Generate an interface that we can use from the node's metadata.
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
@@ -51,22 +49,39 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
         Identity::new(&commitment.encode())
     }
 }
-/// create a new MMR and use it to generate a valid call to create a murmur wallet
-/// returns the call data and the mmr_store
+
+/// Data needed to build a valid call for creating a murmur wallet.
+pub struct CreateData {
+    /// The root of the MMR
+    pub root: Vec<u8>,
+    /// The size of the MMR
+    pub size: u64,
+    pub mmr_store: MurmurStore,
+}
+
+/// Data needed to build a valid call for a proxied execution.
+pub struct ProxyData {
+    pub position: u64,
+    /// The hash of the commitment
+    pub hash: Vec<u8>,
+    pub ciphertext: Vec<u8>,
+    pub proof_items: Vec<Vec<u8>>,
+    pub size: u64,
+}
+
+/// Create a new MMR and return the data needed to build a valid call for creating a murmur wallet.
 ///
-/// * `name`: The name of the murmur proxy
 /// * `seed`: The seed used to generate otp codes
 /// * `ephem_msk`: An ephemeral secret key TODO: replace with an hkdf?
 /// * `block_schedule`: A list of block numbers when the wallet will be executable
 /// * `round_pubkey_bytes`: The Ideal Network randomness beacon public key
 ///
 pub fn create(
-    name: Vec<u8>,
     mut seed: Vec<u8>,
     mut ephem_msk: [u8; 32],
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
-) -> Result<(TxPayload<Create>, MurmurStore), Error> {
+) -> Result<CreateData, Error> {
     let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
         .map_err(|_| Error::InvalidPubkey)?;
     let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
@@ -79,35 +94,33 @@ pub fn create(
     seed.zeroize();
     let root = mmr_store.root.clone();
 
-    let call = etf::tx()
-        .murmur()
-        .create(root.0, mmr_store.metadata.len() as u64, BoundedVec(name));
-    Ok((call, mmr_store))
+    Ok(CreateData {
+        root: root.0,
+        size: mmr_store.metadata.len() as u64,
+        mmr_store,
+    })
 }
 
-/// prepare the call for immediate execution
-/// Note to self: in the future, we can consider ways to prune the murmurstore as OTP codes are consumed
-///     for example, we can take the next values from the map, reducing storage to 0 over time
-///     However, to do this we need to think of a way to prove it with a merkle proof
-///     my thought is that we would have a subtree, so first we prove that the subtree is indeed in the parent MMR
-///     then we prove that the specific leaf is in the subtree.
-///  We could potentially use that idea as a way to optimize the execute function in general. Rather than
-///  loading the entire MMR into memory, we really only need to load a  minimal subtree containing the leaf we want to consume
-/// -> add this to the 'future work' section later
-///
-/// * `name`: The name of the murmur proxy
+/// Return the data needed for the immediate execution of the proxied call.
 /// * `seed`: The seed used to generate otp codes
 /// * `when`: The block number when OTP codeds should be generated
 /// * `store`: A murmur store
-/// * `call`: Any valid runtime call
+/// * `call`: Proxied call. Any valid runtime call
 ///
+// Note to self: in the future, we can consider ways to prune the murmurstore as OTP codes are consumed
+//     for example, we can take the next values from the map, reducing storage to 0 over time
+//     However, to do this we need to think of a way to prove it with a merkle proof
+//     my thought is that we would have a subtree, so first we prove that the subtree is indeed in the parent MMR
+//     then we prove that the specific leaf is in the subtree.
+//  We could potentially use that idea as a way to optimize the execute function in general. Rather than
+//  loading the entire MMR into memory, we really only need to load a  minimal subtree containing the leaf we want to consume
+// -> add this to the 'future work' section later
 pub fn prepare_execute(
-    name: Vec<u8>,
     mut seed: Vec<u8>,
     when: BlockNumber,
     store: MurmurStore,
-    call: RuntimeCall,
-) -> Result<TxPayload<Proxy>, Error> {
+    call: &RuntimeCall,
+) -> Result<ProxyData, Error> {
     let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
     seed.zeroize();
     let size = proof.mmr_size();
@@ -117,15 +130,13 @@ pub fn prepare_execute(
         .map(|leaf| leaf.0.clone())
         .collect::<Vec<_>>();
 
-    Ok(etf::tx().murmur().proxy(
-        BoundedVec(name),
-        pos,
-        commitment,
+    Ok(ProxyData {
+        position: pos,
+        hash: commitment,
         ciphertext,
         proof_items,
         size,
-        call,
-    ))
+    })
 }
 
 /// Async connection to the Ideal Network
@@ -167,87 +178,63 @@ pub async fn idn_connect(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-    use subxt::tx::TxPayload;
 
     #[test]
-    pub fn it_can_create_an_mmr_store_and_call_data() {
-        let name = b"name".to_vec();
+    pub fn it_can_create_an_mmr_store() {
         let seed = b"seed".to_vec();
         let ephem_msk = [1; 32];
         let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
         let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-        let (call, mmr_store) = create(
-            name.clone(),
-            seed,
+        let create_data = create(
+            seed.clone(),
             ephem_msk,
-            block_schedule,
-            double_public_bytes,
+            block_schedule.clone(),
+            double_public_bytes.clone(),
         )
         .unwrap();
 
-        let expected_call = etf::tx().murmur().create(
-            mmr_store.root.0,
-            mmr_store.metadata.len() as u64,
-            BoundedVec(name),
-        );
+        let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
+            seed,
+            block_schedule,
+            ephem_msk,
+            DoublePublicKey::<TinyBLS377>::from_bytes(&double_public_bytes).unwrap(),
+        )
+        .unwrap();
 
-        let actual_details = call.validation_details().unwrap();
-        let expected_details = expected_call.validation_details().unwrap();
-
-        assert_eq!(actual_details.pallet_name, expected_details.pallet_name,);
-
-        assert_eq!(actual_details.call_name, expected_details.call_name,);
-
-        assert_eq!(actual_details.hash, expected_details.hash,);
+        assert_eq!(create_data.mmr_store.root, mmr_store.root);
+        assert_eq!(create_data.size, 7);
     }
 
     #[test]
     pub fn it_can_prepare_valid_execution_call_data() {
-        let name = b"name".to_vec();
         let seed = b"seed".to_vec();
         let ephem_msk = [1; 32];
         let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
         let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-        let (_call, mmr_store) = create(
-            name.clone(),
-            seed.clone(),
-            ephem_msk,
-            block_schedule,
-            double_public_bytes,
-        )
-        .unwrap();
+        let create_data =
+            create(seed.clone(), ephem_msk, block_schedule, double_public_bytes).unwrap();
 
         let bob = subxt_signer::sr25519::dev::bob().public_key();
-        let bob2 = subxt_signer::sr25519::dev::bob().public_key();
         let balance_transfer_call =
-            etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
+            &etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
                 etf::balances::Call::transfer_allow_death {
                     dest: subxt::utils::MultiAddress::<_, u32>::from(bob),
                     value: 1,
                 },
             );
 
-        let balance_transfer_call_2 =
-            etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
-                etf::balances::Call::transfer_allow_death {
-                    dest: subxt::utils::MultiAddress::<_, u32>::from(bob2),
-                    value: 1,
-                },
-            );
-
-        let actual_call = prepare_execute(
-            name.clone(),
+        let proxy_data = prepare_execute(
             seed.clone(),
             1,
-            mmr_store.clone(),
+            create_data.mmr_store.clone(),
             balance_transfer_call,
         )
         .unwrap();
 
-        let (proof, commitment, ciphertext, _pos) = mmr_store
-            .execute(seed.clone(), 1, balance_transfer_call_2.encode())
+        let (proof, commitment, ciphertext, _pos) = create_data
+            .mmr_store
+            .execute(seed.clone(), 1, balance_transfer_call.encode())
             .unwrap();
 
         let size = proof.mmr_size();
@@ -256,23 +243,11 @@ mod tests {
             .iter()
             .map(|leaf| leaf.0.clone())
             .collect::<Vec<_>>();
-        let expected_call = etf::tx().murmur().proxy(
-            BoundedVec(name),
-            0,
-            commitment,
-            ciphertext,
-            proof_items,
-            size,
-            balance_transfer_call_2,
-        );
 
-        let actual_details = actual_call.validation_details().unwrap();
-        let expected_details = expected_call.validation_details().unwrap();
-
-        assert_eq!(actual_details.pallet_name, expected_details.pallet_name,);
-
-        assert_eq!(actual_details.call_name, expected_details.call_name,);
-
-        assert_eq!(actual_details.hash, expected_details.hash,);
+        assert_eq!(proxy_data.position, 0);
+        assert_eq!(proxy_data.hash, commitment);
+        assert_eq!(proxy_data.ciphertext, ciphertext);
+        assert_eq!(proxy_data.proof_items, proof_items);
+        assert_eq!(proxy_data.size, size);
     }
 }
