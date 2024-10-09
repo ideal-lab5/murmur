@@ -16,6 +16,7 @@
 
 use beefy::{known_payloads, Commitment, Payload};
 use murmur_core::types::{Identity, IdentityBuilder};
+use serde::Serialize;
 use subxt::{
     backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig, ext::codec::Encode,
 };
@@ -23,8 +24,7 @@ use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 use zeroize::Zeroize;
 
 pub use etf::runtime_types::{
-    bounded_collections::bounded_vec::BoundedVec,
-    node_template_runtime::RuntimeCall,
+    bounded_collections::bounded_vec::BoundedVec, node_template_runtime::RuntimeCall,
 };
 pub use murmur_core::{
     murmur::{Error, MurmurStore},
@@ -50,6 +50,7 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
     }
 }
 
+#[derive(Serialize)]
 /// Data needed to build a valid call for creating a murmur wallet.
 pub struct CreateData {
     /// The root of the MMR
@@ -59,6 +60,7 @@ pub struct CreateData {
     pub mmr_store: MurmurStore,
 }
 
+#[derive(Serialize)]
 /// Data needed to build a valid call for a proxied execution.
 pub struct ProxyData {
     pub position: u64,
