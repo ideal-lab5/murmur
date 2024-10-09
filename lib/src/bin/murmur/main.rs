@@ -15,9 +15,7 @@
  */
 use clap::{Parser, Subcommand};
 use murmur_lib::{
-    create,
-    etf::{self, runtime_types::node_template_runtime::RuntimeCall::Balances},
-    idn_connect, prepare_execute, BlockNumber, MurmurStore,
+    create, etf, idn_connect, prepare_execute, BlockNumber, BoundedVec, MurmurStore, RuntimeCall,
 };
 use sp_core::crypto::Ss58Codec;
 use std::fs::File;
@@ -95,6 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &cli.commands {
         Commands::New(args) => {
             println!("🏭 Murmur: Generating Merkle mountain range");
+
             // 1. prepare block schedule
             let mut schedule: Vec<BlockNumber> = Vec::new();
             for i in 2..args.validity + 2 {
@@ -102,57 +101,76 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let next_block_number: BlockNumber = current_block_number + i;
                 schedule.push(next_block_number);
             }
+
             // 2. create mmr
-            let (call, mmr_store) = create(
-                args.name.as_bytes().to_vec(),
+            let create_data = create(
                 args.seed.as_bytes().to_vec(),
                 ephem_msk,
                 schedule,
                 round_pubkey_bytes,
             )
             .map_err(|_| CLIError::MurmurCreationFailed)?;
+
             // 3. add to storage
-            write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
-            // sign and send the call
-            let from = dev::alice();
-            let _events = client
+            write_mmr_store(create_data.mmr_store.clone(), MMR_STORE_FILEPATH);
+
+            // 4. build the call
+            let call = etf::tx().murmur().create(
+                create_data.root,
+                create_data.size,
+                BoundedVec(args.name.as_bytes().to_vec()),
+            );
+
+            // 5. sign and send the call
+            client
                 .tx()
-                .sign_and_submit_then_watch_default(&call, &from)
+                .sign_and_submit_then_watch_default(&call, &dev::alice())
                 .await?;
+
             println!("✅ MMR proxy account creation successful!");
         }
         Commands::Execute(args) => {
-            // build balance transfer
+            // 1. build proxied call
             let from_ss58 = sp_core::crypto::AccountId32::from_ss58check(&args.to)
                 .map_err(|_| CLIError::InvalidRecipient)?;
-
             let bytes: &[u8] = from_ss58.as_ref();
             let from_ss58_sized: [u8; 32] =
                 bytes.try_into().map_err(|_| CLIError::InvalidRecipient)?;
             let to = subxt::utils::AccountId32::from(from_ss58_sized);
+            let balance_transfer_call =
+                RuntimeCall::Balances(etf::balances::Call::transfer_allow_death {
+                    dest: subxt::utils::MultiAddress::<_, u32>::from(to),
+                    value: args.amount,
+                });
 
-            let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
-                dest: subxt::utils::MultiAddress::<_, u32>::from(to),
-                value: args.amount,
-            });
-
+            // 2. load the MMR store
             let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH)?;
-            let target_block_number: BlockNumber = current_block_number + 1;
-
             println!("💾 Recovered Murmur store from local file");
-            let tx = prepare_execute(
-                args.name.as_bytes().to_vec(),
+
+            // 3. get the proxy data
+            let proxy_data = prepare_execute(
                 args.seed.as_bytes().to_vec(),
-                target_block_number,
+                current_block_number + 1,
                 store,
-                balance_transfer_call,
+                &balance_transfer_call,
             )
             .map_err(|_| CLIError::MurmurExecutionFailed)?;
-            // submit the tx using alice to sign it
-            let _result = client
+
+            // 4. build the call
+            let call = etf::tx().murmur().proxy(
+                BoundedVec(args.name.as_bytes().to_vec()),
+                proxy_data.position,
+                proxy_data.hash,
+                proxy_data.ciphertext,
+                proxy_data.proof_items,
+                proxy_data.size,
+                balance_transfer_call,
+            );
+            // 5. sign and send the call
+            client
                 .tx()
-                .sign_and_submit_then_watch_default(&tx, &dev::alice())
-                .await;
+                .sign_and_submit_then_watch_default(&call, &dev::alice())
+                .await?;
         }
     }
     println!("Elapsed time: {:.2?}", before.elapsed());
