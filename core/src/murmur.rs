@@ -21,9 +21,9 @@ use alloc::{collections::BTreeMap, vec, vec::Vec};
 #[cfg(feature = "client")]
 use crate::otp::BOTPGenerator;
 
-use rand_chacha::ChaCha20Rng;
 use ark_std::rand::SeedableRng;
 use ark_std::rand::{CryptoRng, Rng};
+use rand_chacha::ChaCha20Rng;
 
 #[cfg(feature = "client")]
 use zeroize::Zeroize;
@@ -37,6 +37,7 @@ use ckb_merkle_mountain_range::{
     util::{MemMMR, MemStore},
     MerkleProof,
 };
+use codec::{Decode, Encode};
 use etf_crypto_primitives::{encryption::tlock::*, ibe::fullident::Identity};
 use sha3::Digest;
 use w3f_bls::{DoublePublicKey, EngineBLS};
@@ -55,7 +56,7 @@ pub enum Error {
     TlockFailed,
     /// The buffer does not have enough space allocated
     InvalidBufferSize,
-    /// The seed was invalid 
+    /// The seed was invalid
     InvalidSeed,
     /// The public key was invalid (could not be decoded)
     InvalidPubkey,
@@ -63,7 +64,7 @@ pub enum Error {
 
 /// The murmur store contains minimal data required to use a murmur wallet
 #[cfg(feature = "client")]
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Encode, Decode)]
 pub struct MurmurStore {
     /// A map of block numbers to leaf positions in the mmr
     pub metadata: BTreeMap<BlockNumber, Ciphertext>,
@@ -194,8 +195,8 @@ pub fn timelock_encrypt<E: EngineBLS, R: CryptoRng + Rng + Sized>(
     message: &[u8],
     rng: R,
 ) -> Result<Vec<u8>, Error> {
-    let ciphertext = tle::<E, R>(pk, ephemeral_msk, message, identity, rng)
-        .map_err(|_| Error::TlockFailed)?;
+    let ciphertext =
+        tle::<E, R>(pk, ephemeral_msk, message, identity, rng).map_err(|_| Error::TlockFailed)?;
     let mut ct_bytes = Vec::new();
     ciphertext
         .serialize_compressed(&mut ct_bytes)
@@ -210,8 +211,7 @@ fn build_generator(mut seed: Vec<u8>) -> Result<BOTPGenerator, Error> {
     hasher.update(&seed);
     seed.zeroize();
     let hash = hasher.finalize();
-    BOTPGenerator::new(hash.to_vec())
-        .map_err(|_| Error::InvalidSeed)
+    BOTPGenerator::new(hash.to_vec()).map_err(|_| Error::InvalidSeed)
 }
 
 // verify the correctness of execution parameters
@@ -249,10 +249,10 @@ pub fn get_key_index<K: Ord>(b: &BTreeMap<K, impl alloc::fmt::Debug>, key: &K) -
 mod tests {
 
     use super::*;
-    use w3f_bls::{DoublePublicKeyScheme, TinyBLS377};
+    use ark_std::rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use rand_core::OsRng;
-    use ark_std::rand::SeedableRng;
+    use w3f_bls::{DoublePublicKeyScheme, TinyBLS377};
 
     pub struct DummyIdBuilder;
     impl IdentityBuilder<BlockNumber> for DummyIdBuilder {
