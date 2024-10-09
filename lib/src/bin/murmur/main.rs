@@ -149,7 +149,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // 3. get the proxy data
             let proxy_data = prepare_execute(
-                // args.name.as_bytes().to_vec(),
                 args.seed.as_bytes().to_vec(),
                 current_block_number + 1,
                 store,
