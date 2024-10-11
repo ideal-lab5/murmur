@@ -60,6 +60,7 @@ pub enum Error {
     InvalidSeed,
     /// The public key was invalid (could not be decoded)
     InvalidPubkey,
+    KeyDerivationFailed,
 }
 
 /// The murmur store contains minimal data required to use a murmur wallet
@@ -271,9 +272,12 @@ mod tests {
             keypair.public.0,
         );
 
-        let ephem_msk = [1; 32];
         let seed = vec![1, 2, 3];
         let schedule = vec![1, 2, 3];
+
+        let hk = hkdf::Hkdf::<sha3::Sha3_256>::new(None, &seed);
+        let mut ephem_msk = [0u8; 32];
+        hk.expand(b"ephemeral key", &mut ephem_msk).unwrap();
 
         let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),
@@ -295,13 +299,16 @@ mod tests {
             keypair.public.0,
         );
 
-        let ephem_msk = [1; 32];
         let seed = vec![1, 2, 3];
         let schedule = vec![
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
         ];
 
         let aux_data = vec![2, 3, 4, 5];
+
+        let hk = hkdf::Hkdf::<sha3::Sha3_256>::new(None, &seed);
+        let mut ephem_msk = [0u8; 32];
+        hk.expand(b"ephemeral key", &mut ephem_msk).unwrap();
 
         let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),
@@ -349,11 +356,14 @@ mod tests {
             keypair.public.0,
         );
 
-        let ephem_msk = [1; 32];
         let seed = vec![1, 2, 3];
         let schedule = vec![1, 2, 3, 4, 5];
 
         let aux_data = vec![2, 3, 4, 5];
+
+        let hk = hkdf::Hkdf::<sha3::Sha3_256>::new(None, &seed);
+        let mut ephem_msk = [0u8; 32];
+        hk.expand(b"ephemeral key", &mut ephem_msk).unwrap();
 
         let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),
@@ -381,11 +391,14 @@ mod tests {
             keypair.public.0,
         );
 
-        let ephem_msk = [1; 32];
         let seed = vec![1, 2, 3];
         let schedule = vec![1, 2, 3];
 
         let aux_data = vec![2, 3, 4, 5];
+
+        let hk = hkdf::Hkdf::<sha3::Sha3_256>::new(None, &seed);
+        let mut ephem_msk = [0u8; 32];
+        hk.expand(b"ephemeral key", &mut ephem_msk).unwrap();
 
         let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),
@@ -432,12 +445,15 @@ mod tests {
             keypair.public.0,
         );
 
-        let ephem_msk = [1; 32];
         let seed = vec![1, 2, 3];
         let schedule = vec![1, 2, 3];
         let other_schedule = vec![1, 2, 3, 4, 5];
 
         let aux_data = vec![2, 3, 4, 5];
+
+        let hk = hkdf::Hkdf::<sha3::Sha3_256>::new(None, &seed);
+        let mut ephem_msk = [0u8; 32];
+        hk.expand(b"ephemeral key", &mut ephem_msk).unwrap();
 
         let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder>(
             seed.clone(),

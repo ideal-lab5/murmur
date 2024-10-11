@@ -15,6 +15,7 @@
  */
 
 use beefy::{known_payloads, Commitment, Payload};
+use hkdf::Hkdf;
 use murmur_core::types::{Identity, IdentityBuilder};
 use serde::Serialize;
 use subxt::{
@@ -74,16 +75,20 @@ pub struct ProxyData {
 /// Create a new MMR and return the data needed to build a valid call for creating a murmur wallet.
 ///
 /// * `seed`: The seed used to generate otp codes
-/// * `ephem_msk`: An ephemeral secret key TODO: replace with an hkdf?
 /// * `block_schedule`: A list of block numbers when the wallet will be executable
 /// * `round_pubkey_bytes`: The Ideal Network randomness beacon public key
 ///
 pub fn create(
     mut seed: Vec<u8>,
-    mut ephem_msk: [u8; 32],
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
 ) -> Result<CreateData, Error> {
+    // Derive ephem_msk from seed using HKDF
+    let hk = Hkdf::<sha3::Sha3_256>::new(None, &seed);
+    let mut ephem_msk = [0u8; 32];
+    hk.expand(b"ephemeral key", &mut ephem_msk)
+        .map_err(|_| Error::KeyDerivationFailed)?;
+
     let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
         .map_err(|_| Error::InvalidPubkey)?;
     let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
@@ -185,16 +190,18 @@ mod tests {
     #[test]
     pub fn it_can_create_an_mmr_store() {
         let seed = b"seed".to_vec();
-        let ephem_msk = [1; 32];
         let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
         let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
         let create_data = create(
             seed.clone(),
-            ephem_msk,
             block_schedule.clone(),
             double_public_bytes.clone(),
         )
         .unwrap();
+
+        let hk = Hkdf::<sha3::Sha3_256>::new(None, &seed);
+        let mut ephem_msk = [0u8; 32];
+        hk.expand(b"ephemeral key", &mut ephem_msk).unwrap();
 
         let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
             seed,
@@ -211,11 +218,10 @@ mod tests {
     #[test]
     pub fn it_can_prepare_valid_execution_call_data() {
         let seed = b"seed".to_vec();
-        let ephem_msk = [1; 32];
         let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
         let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
         let create_data =
-            create(seed.clone(), ephem_msk, block_schedule, double_public_bytes).unwrap();
+            create(seed.clone(), block_schedule, double_public_bytes).unwrap();
 
         let bob = subxt_signer::sr25519::dev::bob().public_key();
         let balance_transfer_call =

@@ -86,7 +86,6 @@ pub const MMR_STORE_FILEPATH: &str = "mmr_store";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let before = Instant::now();
-    let ephem_msk = [1; 32];
 
     let (client, current_block_number, round_pubkey_bytes) = idn_connect().await?;
 
@@ -105,7 +104,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // 2. create mmr
             let create_data = create(
                 args.seed.as_bytes().to_vec(),
-                ephem_msk,
                 schedule,
                 round_pubkey_bytes,
             )

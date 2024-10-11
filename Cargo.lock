@@ -1998,6 +1998,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212ab92002354b4819390025006c897e8140934349e8635c9b077f47b4dcbd20"
 
 [[package]]
+name = "hkdf"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
+dependencies = [
+ "hmac 0.12.1",
+]
+
+[[package]]
 name = "hmac"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2509,6 +2518,7 @@ dependencies = [
  "ark-std",
  "ckb-merkle-mountain-range",
  "etf-crypto-primitives 0.2.4 (git+https://github.com/ideal-lab5/etf-sdk/?branch=dev)",
+ "hkdf",
  "parity-scale-codec",
  "rand_chacha",
  "rand_core",
@@ -2529,6 +2539,7 @@ dependencies = [
  "ark-std",
  "ckb-merkle-mountain-range",
  "clap",
+ "hkdf",
  "murmur-core",
  "murmur-test-utils",
  "parity-scale-codec",
