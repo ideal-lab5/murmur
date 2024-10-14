@@ -2,8 +2,15 @@
 name = "murmur-core"
 version = "0.1.0"
 edition = "2021"
+description = "Murmur core"
+documentation = "https://docs.rs/murmur-core"
+readme = "README.md"
+keywords = ["crypto", "wallet", "keyless"]
+categories = ["development-tools", "cryptography"]
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [lints]
 workspace = true

@@ -8,10 +8,11 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-authors = ["Ideal Labs <driemworks@idealabs.network>"]
+authors = ["Ideal Labs <hello@idealabs.network>"]
 repository = "https://github.com/ideal-lab5/murmur"
 homepage = "https://idealabs.network"
 license = "Apache-2.0"
+description = "Murmur crates"
 
 [workspace.lints.rust]
 suspicious_double_ref_op = { level = "allow", priority = 2 }

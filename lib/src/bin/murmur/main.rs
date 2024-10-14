@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 use clap::{Parser, Subcommand};
 use murmur_lib::{
     create, etf, idn_connect, prepare_execute, BlockNumber, BoundedVec, MurmurStore, RuntimeCall,
@@ -102,12 +103,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // 2. create mmr
-            let create_data = create(
-                args.seed.as_bytes().to_vec(),
-                schedule,
-                round_pubkey_bytes,
-            )
-            .map_err(|_| CLIError::MurmurCreationFailed)?;
+            let create_data = create(args.seed.as_bytes().to_vec(), schedule, round_pubkey_bytes)
+                .map_err(|_| CLIError::MurmurCreationFailed)?;
 
             // 3. add to storage
             write_mmr_store(create_data.mmr_store.clone(), MMR_STORE_FILEPATH);
