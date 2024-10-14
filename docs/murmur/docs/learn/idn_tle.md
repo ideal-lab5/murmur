@@ -1,1 +1,0 @@
-# Randomness, Timelock Encryption, and The Ideal Network

@@ -8,13 +8,13 @@ const FeatureList = [
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Murmur wallets are inherently **keyless** - 
+        users are not responsible for storing and securing mnemonics or secret keys.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
+    title: 'Wallet-as-a-Service',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
@@ -24,7 +24,7 @@ const FeatureList = [
     ),
   },
   {
-    title: 'Powered by React',
+    title: 'Seamless Cross-Platform Interoperbility',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>

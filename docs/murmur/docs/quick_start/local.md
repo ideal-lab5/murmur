@@ -36,7 +36,7 @@ murmur new --name SomeUniqueName --seed 0xAnyString --validity 1000
 ## Execute a Balance Transfer
 
 ``` shell
-murmur new --name SomeUniqueName --seed 0xAnyString --to SomeRecipientAddress --amount 10
+murmur execute --name SomeUniqueName --seed 0xAnyString --to SomeRecipientAddress --amount 10
 ```
 
 ## Update a Wallet

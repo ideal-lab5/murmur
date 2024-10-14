@@ -4,14 +4,21 @@ sidebar_position: 3
 
 # Browser Integration
 
-Murmur can be easily integrate into web applications with **murmur.js**, a javascript wrapper that allows you to communicate with the `murmur-api`.
+Murmur can be easily integrated into web applications with [murmur.js](https://github.com/ideal-lab5/murmur.js), a javascript wrapper that allows you to communicate with the `murmur-api`.
 
-> This is a WIP and subject to major changes.
+1. [Integrate Murmur](#integrate-murmur)
+2. [Sequence Diagram](#sequence-diagram)
 
-## Integrate Murmur
+## Murmur Integration Guide
+
+To get started, create a new javascript-based project (e.g. `npx init`). Then install the following dependencies
+
+```shell
+npm i @ideallabs/murmur.js axios @polkadot/api
+```
 
 ``` js
-import { MurmurStore } from "murmur.js";
+import { MurmurStore } from "@ideallabs/murmur.js";
 // setup axios and polkadotjs
 let { axios, api } = await setup()
 // instantiate an instance of a murmur store 
@@ -63,3 +70,7 @@ murmur.inspect(name).then(result => {
     console.log(result)
 })
 ```
+
+## Sequence Diagram
+
+![sequence_diagram](../../assets/murmur_seq_diagram.drawio.png)

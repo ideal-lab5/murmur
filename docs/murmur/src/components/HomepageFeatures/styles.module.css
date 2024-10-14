@@ -12,31 +12,46 @@
 
 /* General Layout */
 body {
-  background-color: #1a1a1a; /* Deep dark background */
-  color: #e0e0e0; /* Light gray for readability */
-  font-family: 'Nunito', sans-serif; /* Friendly rounded font */
+  background-color: #1a1a1a;
+  /* Deep dark background */
+  color: #e0e0e0;
+  /* Light gray for readability */
+  font-family: 'Nunito', sans-serif;
+  /* Friendly rounded font */
   margin: 0;
   padding: 0;
 }
 
 /* Links */
 a {
-  color: #61dafb; /* Neon blue for links */
+  color: #61dafb;
+  /* Neon blue for links */
   text-decoration: none;
-  border-bottom: 2px solid transparent; /* Underline only on hover */
+  border-bottom: 2px solid transparent;
+  /* Underline only on hover */
   transition: color 0.3s ease, border-bottom 0.3s ease;
 }
 
 a:hover {
-  color: #4a90e2; /* Darker blue on hover */
-  border-bottom: 2px solid #4a90e2; /* Blue underline on hover */
+  color: #4a90e2;
+  /* Darker blue on hover */
+  border-bottom: 2px solid #4a90e2;
+  /* Blue underline on hover */
 }
 
 /* Headers */
-h1, h2, h3, h4, h5, h6 {
-  color: #ffffff; /* Bright white headers */
-  font-weight: 700; /* Bold headers */
-  letter-spacing: 0.5px; /* Slightly spaced letters */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #ffffff;
+  /* Bright white headers */
+  font-weight: 700;
+  /* Bold headers */
+  letter-spacing: 0.5px;
+  /* Slightly spaced letters */
   margin-bottom: 16px;
 }
 
@@ -50,49 +65,64 @@ h2 {
 
 /* Buttons */
 button {
-  background-color: #4a90e2; /* Darker blue button */
+  background-color: #4a90e2;
+  /* Darker blue button */
   color: #ffffff;
-  border-radius: 10px; /* Rounded corners for a cozy feel */
+  border-radius: 10px;
+  /* Rounded corners for a cozy feel */
   padding: 12px 24px;
   border: none;
   font-family: 'Nunito', sans-serif;
   font-size: 1rem;
   cursor: pointer;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Soft shadow */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  /* Soft shadow */
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 button:hover {
-  background-color: #61dafb; /* Neon blue on hover */
-  transform: translateY(-2px); /* Slight lift effect on hover */
+  background-color: #61dafb;
+  /* Neon blue on hover */
+  transform: translateY(-2px);
+  /* Slight lift effect on hover */
 }
 
 /* Code Blocks */
 pre {
-  background-color: #333333; /* Dark background for code blocks */
-  color: #e0e0e0; /* Light text for readability */
-  border-left: 4px solid #61dafb; /* Blue border for tech vibe */
+  background-color: #333333;
+  /* Dark background for code blocks */
+  color: #e0e0e0;
+  /* Light text for readability */
+  border-left: 4px solid #61dafb;
+  /* Blue border for tech vibe */
   padding: 16px;
-  border-radius: 6px; /* Rounded corners */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Soft shadow */
+  border-radius: 6px;
+  /* Rounded corners */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  /* Soft shadow */
 }
 
 /* Containers */
 .container {
   padding: 24px;
   margin: 16px;
-  background-color: #2c2c2c; /* Slightly lighter dark background */
-  border-radius: 12px; /* Rounded corners */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Soft shadow */
+  background-color: #2c2c2c;
+  /* Slightly lighter dark background */
+  border-radius: 12px;
+  /* Rounded corners */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  /* Soft shadow */
   color: #e0e0e0;
 }
 
 /* Footer */
 footer {
-  background-color: #121212; /* Very dark footer */
+  background-color: #121212;
+  /* Very dark footer */
   padding: 20px;
   text-align: center;
-  color: #888888; /* Muted text for footer */
+  color: #888888;
+  /* Muted text for footer */
 }
 
 /* Smooth Animations */
@@ -103,12 +133,16 @@ footer {
 /* Link Hover Effect */
 a:hover {
   color: #61dafb;
-  border-bottom: 2px solid #61dafb; /* Blue underline on hover */
+  border-bottom: 2px solid #61dafb;
+  /* Blue underline on hover */
 }
 
 /* Button Hover Effect */
 button:hover {
-  transform: translateY(-4px); /* Slight lift on hover */
-  background-color: #61dafb; /* Neon blue hover state */
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3); /* Softer, bigger shadow on hover */
+  transform: translateY(-4px);
+  /* Slight lift on hover */
+  background-color: #61dafb;
+  /* Neon blue hover state */
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+  /* Softer, bigger shadow on hover */
 }
