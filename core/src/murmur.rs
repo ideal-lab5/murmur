@@ -45,7 +45,9 @@ use w3f_bls::{DoublePublicKey, EngineBLS};
 /// Error types for murmur wallet usage
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    /// An error occurred when executing a call
     ExecuteError,
+    /// An error occurred when creating a murmur wallet
     MMRError,
     InconsistentStore,
     /// No leaf could be identified in the MMR at the specified position
@@ -60,6 +62,7 @@ pub enum Error {
     InvalidSeed,
     /// The public key was invalid (could not be decoded)
     InvalidPubkey,
+    /// The key derivation failed
     KeyDerivationFailed,
 }
 
