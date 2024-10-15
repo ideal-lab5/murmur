@@ -2,6 +2,7 @@
 name = "murmur-test-utils"
 version = "0.1.0"
 edition = "2021"
+description = "Murmur test utils"
 authors.workspace = true
 license.workspace = true
 
