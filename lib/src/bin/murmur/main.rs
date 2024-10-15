@@ -15,21 +15,15 @@
  */
 use clap::{Parser, Subcommand};
 use murmur_lib::{
-    create, etf, etf::runtime_types::node_template_runtime::RuntimeCall::Balances, idn_connect,
-    prepare_execute, BlockNumber, MurmurStore,
+    create,
+    etf::{self, runtime_types::node_template_runtime::RuntimeCall::Balances},
+    idn_connect, prepare_execute, BlockNumber, MurmurStore,
 };
 use sp_core::crypto::Ss58Codec;
 use std::fs::File;
 use std::time::Instant;
-use subxt_core::config::Hasher;
 use subxt_signer::sr25519::dev;
 use thiserror::Error;
-
-
-use frame_support::{
-    BoundedVec,
-    traits::ConstU32,
-};
 
 /// Command line
 #[derive(Parser)]
@@ -46,7 +40,6 @@ enum Commands {
     New(WalletCreationDetails),
     /// dispatch (proxy) a call to a murmur wallet
     Execute(WalletExecuteDetails),
-    Inspect(WalletInspectDetails),
 }
 
 #[derive(Parser)]
@@ -67,14 +60,8 @@ struct WalletExecuteDetails {
     seed: String,
     #[arg(long, short)]
     to: String,
-    #[arg(short, long)]
-    amount: String,
-}
-
-#[derive(Parser)]
-struct WalletInspectDetails {
-    #[arg(long, short)]
-    name: String,
+    #[arg(short, long, value_parser = clap::value_parser!(u128))]
+    amount: u128,
 }
 
 #[derive(Error, Debug)]
@@ -143,15 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let from_ss58_sized: [u8; 32] =
                 bytes.try_into().map_err(|_| CLIError::InvalidRecipient)?;
             let to = subxt::utils::AccountId32::from(from_ss58_sized);
-            let v: u128 = args
-                .amount
-                .split_whitespace()
-                .map(|r| r.replace('_', "").parse().unwrap())
-                .collect::<Vec<_>>()[0];
 
             let balance_transfer_call = Balances(etf::balances::Call::transfer_allow_death {
                 dest: subxt::utils::MultiAddress::<_, u32>::from(to),
-                value: v,
+                value: args.amount,
             });
 
             let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH)?;
@@ -171,36 +153,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .tx()
                 .sign_and_submit_then_watch_default(&tx, &dev::alice())
                 .await;
-        }
-        Commands::Inspect(args) => {
-            // Build a storage query to access account information.
-            let account = dev::alice().public_key().into();
-            let storage_query = etf::storage().system().account(&account);
-            println!("{:?}", storage_query);
-
-            // // Use that query to `fetch` a result. This returns an `Option<_>`, which will be
-            // // `None` if no value exists at the given address. You can also use `fetch_default`
-            // // where applicable, which will return the default value if none exists.
-            // let result = client
-            //     .storage()
-            //     .at_latest()
-            //     .await?
-            //     .fetch(&storage_query)
-            //     .await?;
-
-            // let v = result.unwrap().data.free;
-            // println!("Alice: {v}");
-            // let blake2_hash =
-            //     subxt_core::config::substrate::BlakeTwo256::hash_of(&args.name.as_bytes().to_vec());
-            // println!("{:?}", blake2_hash);
-            // let who = BoundedVec(blake2_hash.0.to_vec());
-            // let who = BoundedVec(args.name.as_bytes().to_vec());
-            // let who = BoundedVec::<u8, ConstU32<32>>::truncate_from(args.name.as_bytes().to_vec());
-            // println!("{:?}", who);
-            // let query = etf::storage().murmur().registry(&who.into());
-            // println!("{:?}", query);
-            // let result = client.storage().at_latest().await?.fetch(&query).await?;
-            // println!("result {:?}", result);
         }
     }
     println!("Elapsed time: {:.2?}", before.elapsed());

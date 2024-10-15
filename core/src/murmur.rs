@@ -26,6 +26,9 @@ use ark_std::rand::SeedableRng;
 use ark_std::rand::{CryptoRng, Rng};
 
 #[cfg(feature = "client")]
+use zeroize::Zeroize;
+
+#[cfg(feature = "client")]
 use ark_serialize::CanonicalSerialize;
 
 use crate::types::*;
@@ -78,12 +81,13 @@ impl MurmurStore {
     /// * `round_public_key`: The IDN beacon's public key
     ///
     pub fn new<E: EngineBLS, I: IdentityBuilder<BlockNumber>>(
-        seed: Vec<u8>,
+        mut seed: Vec<u8>,
         block_schedule: Vec<BlockNumber>,
-        ephemeral_msk: [u8; 32],
+        mut ephemeral_msk: [u8; 32],
         round_public_key: DoublePublicKey<E>,
     ) -> Result<Self, Error> {
-        let totp = build_generator(&seed.clone())?;
+        let totp = build_generator(seed.clone())?;
+        seed.zeroize();
         let mut metadata = BTreeMap::new();
 
         let store = MemStore::default();
@@ -114,6 +118,7 @@ impl MurmurStore {
             metadata.insert(*i, ct_bytes);
         }
 
+        ephemeral_msk.zeroize();
         let root = mmr.get_root().map_err(|_| Error::InconsistentStore)?;
 
         Ok(MurmurStore { metadata, root })
@@ -127,12 +132,13 @@ impl MurmurStore {
     ///
     pub fn execute(
         &self,
-        seed: Vec<u8>,
+        mut seed: Vec<u8>,
         when: BlockNumber,
         call_data: Vec<u8>,
     ) -> Result<(MerkleProof<Leaf, MergeLeaves>, Vec<u8>, Ciphertext, u64), Error> {
         if let Some(ciphertext) = self.metadata.get(&when) {
             let commitment = MurmurStore::commit(seed.clone(), when, &call_data.clone())?;
+            seed.zeroize();
             let idx = get_key_index(&self.metadata, &when)
                 .expect("The key must exist within the metadata.");
             let pos = leaf_index_to_pos(idx as u64);
@@ -152,8 +158,9 @@ impl MurmurStore {
     /// * `when`: The block number when the commitment is verifiable
     /// * `data`: The data to commit to
     ///
-    fn commit(seed: Vec<u8>, when: BlockNumber, data: &[u8]) -> Result<Vec<u8>, Error> {
-        let botp = build_generator(&seed)?;
+    fn commit(mut seed: Vec<u8>, when: BlockNumber, data: &[u8]) -> Result<Vec<u8>, Error> {
+        let botp = build_generator(seed.clone())?;
+        seed.zeroize();
         let otp_code = botp.generate(when);
 
         let mut hasher = sha3::Sha3_256::default();
@@ -198,9 +205,10 @@ pub fn timelock_encrypt<E: EngineBLS, R: CryptoRng + Rng + Sized>(
 
 /// Build a block-otp generator from the seed
 #[cfg(feature = "client")]
-fn build_generator(seed: &[u8]) -> Result<BOTPGenerator, Error> {
+fn build_generator(mut seed: Vec<u8>) -> Result<BOTPGenerator, Error> {
     let mut hasher = sha3::Sha3_256::default();
-    hasher.update(seed);
+    hasher.update(&seed);
+    seed.zeroize();
     let hash = hasher.finalize();
     BOTPGenerator::new(hash.to_vec())
         .map_err(|_| Error::InvalidSeed)
@@ -318,7 +326,7 @@ mod tests {
 
         // in practice, the otp code would be timelock decrypted
         // but for testing purposes, we will just calculate the expected one now
-        let botp = build_generator(&seed.clone()).unwrap();
+        let botp = build_generator(seed.clone()).unwrap();
         let otp_code = botp.generate(when);
 
         assert!(verify(
@@ -396,7 +404,7 @@ mod tests {
 
         // in practice, the otp code would be timelock decrypted
         // but for testing purposes, we will just calculate the expected one now
-        let botp = build_generator(&seed.clone()).unwrap();
+        let botp = build_generator(seed.clone()).unwrap();
         let otp_code = botp.generate(when);
 
         let bad_aux = vec![2, 3, 13, 3];
@@ -456,7 +464,7 @@ mod tests {
 
         // in practice, the otp code would be timelock decrypted
         // but for testing purposes, we will just calculate the expected one now
-        let botp = build_generator(&seed.clone()).unwrap();
+        let botp = build_generator(seed.clone()).unwrap();
         let otp_code = botp.generate(when);
         assert!(!verify(
             root,

@@ -5,21 +5,23 @@ import styles from './styles.module.css';
 const FeatureList = [
   {
     title: 'Keyless',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    Svg: require('@site/static/img/no_key.svg').default,
     description: (
       <>
-        Murmur wallets are inherently **keyless** - 
-        users are not responsible for storing and securing mnemonics or secret keys.
+        Murmur wallets are truly **keyless** - 
+        users are not responsible for storing and securing mnemonics or secret keys. 
+        The protocol requires no keystore or key recovery (e.g. threshold signing) for individual wallets.
       </>
     ),
   },
   {
-    title: 'Wallet-as-a-Service',
+    title: 'Create In-App Wallets',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Murmur lets you create in-app wallets that are entirely non-custodial and under user control. It lets developers easily
+        add web3 capabilities to applications without the burden of key management. It enables seamless account abstraction for users
+        without sacrificing decentralization or other core ethos of web3.
       </>
     ),
   },

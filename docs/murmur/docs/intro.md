@@ -24,7 +24,7 @@ Murmur offers a distinct alternative to tradition MPC wallets. Normally, MPC wal
 - **Scalability issues**: More users means more requests for signatures and more load on the network
 - **Increased Costs**: Users can encounter significant fees for higher security, essentially placing wallet security behind a paywall
 
-Murmur sidesteps these disadvantages by relying on the Ideal Network's [randomness beacon](https://docs.idealabs.network/docs/learn/etf-pfg) to produce decryption keys for future OTP codes. Rather than producing threshold signatures on-demand, threshold signatures are produced with each block finalized by the IDN. This results in a highly scalable, cost-efficient, and decentralized wallet solution.
+Murmur sidesteps these disadvantages by relying on the Ideal Network's [randomness beacon](https://docs.idealabs.network/docs/learn/etf-pfg) to produce decryption keys for future OTP codes. Rather than producing threshold signatures on-demand, threshold signatures are produced with each block finalized by the IDN. This results in a highly scalable, cost-efficient, and decentralized wallet solution, where more users does not correlate with added computational overhead.
 
 **Key Features**
 - **Truly Keyless Wallet**: No mnemonic or key management required.
@@ -51,11 +51,6 @@ Check out the [browser integration guide](./quick_start/browser.md) to learn how
 **Standalone Client**
 You can also run the murmur wallet using a standalone client. Try the [cli](./quick_start/local.md) for a terminal based client that allows you to create a wallet and execute basic balance transfers.
 
-<!-- ## Future Work
-This type of wallet requires that murmur wallet user transactions are signed on behalf of an origin with enough funding to cover any resultant transaction fees. While we do not address it in this work, we leave it as an open task to address a potential paymaster scheme. This also allows for KYC or other such mechanisms to easily be established (e.g. if there is a semi-centralized API required to sign transction).
+## Question?
 
-- Performance Improvements
-    - batch verification for execution and updates 
-        - what if we used a Verkle Mountain range instead? 
-        - This could let us represent many murmur wallets with a single data structure
-        - also a VMR allows for more efficient 'multiproofs', so I suppose you could efficiently prove a set of murmur wallets, connected within a VMR, can efficiently be proved in a batch verification scenario  -->
+If you have questions about Murmur or the Ideal network, get in touch by [joining our discord channel](https://discord.gg/phZvQkzU2a).
