@@ -1,4 +1,6 @@
-# Website
+# Murmur Docs
+
+This is the official documentation for the murmur protocol.
 
 This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
 

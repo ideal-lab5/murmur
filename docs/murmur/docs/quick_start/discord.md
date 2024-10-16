@@ -32,10 +32,10 @@ If you configured the bot correctly in step 1 then you will see the bot come onl
 
 Any users in the server can interact with the Murmur Wallet Bot at any time by tagging the bot and invoking various commands. The bot uses murmur.js to call the murmur-api, so usage if very similar. Specifically, users first authenticate with the API, after which they can create wallets, execute balance transfers, and view their own public key and balance. Below, we detail the bot commands:
 
-- **!auth**: Authenticate with the murmur API to receive a seed.
+- **!auth**: Authenticate with the Murmur API to receive a seed.
 Example: `@murmur-discord-bot !auth`
 
-- **!create**: Create a new murmur wallet for the Discord user for a given validity period (number of blocks from now until the wallet expires). The wallet will be named the same as the discord username. 
+- **!create**: Create a new Murmur wallet for the Discord user for a given validity period (number of blocks from now until the wallet expires). The wallet will be named the same as the discord username. 
 Example: `@murmur-discord-bot !create 1000`
 
 - **!execute**: Execute a balance transfer by specifying an account address and amount

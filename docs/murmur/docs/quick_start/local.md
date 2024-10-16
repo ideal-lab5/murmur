@@ -4,13 +4,13 @@ sidebar_position: 3
 
 # Murmur CLI
 
-Create and execute a murmur wallet from a terminal.
+Create and execute a Murmur wallet from a terminal.
 
-The murmur-cli is a standalone client that creates and manages Merkle mountain range data for murmur wallets. It can be used to create new murmur wallets and to execute balance transfers from them against the Ideal Network's testnet.
+The murmur-cli is a standalone client that creates and manages Merkle mountain range data for Murmur wallets. It can be used to create new Murmur wallets and to execute balance transfers from them on the Ideal Network.
 
 ## Installation
 
-The easiest way to install the murmur client is with [cargo](https://doc.rust-lang.org/cargo/) install. By default it will try to connect to a Substrate node running on `localhost:9944`. This can be configured by specifying the environment variable `WS_URL` (e.g. `WS_URL=ws://localhost:9945`).
+The easiest way to install the Murmur client is with [cargo](https://doc.rust-lang.org/cargo/) install. By default it will try to connect to a Substrate node running on `localhost:9944`. This can be configured by specifying the environment variable `WS_URL` (e.g. `WS_URL=ws://localhost:9945`).
 
 ``` shell
 cargo install --git https://github.com/ideal-lab5/murmur

@@ -9,7 +9,7 @@ A detailed mathetmatical description of the Murmur protocol. For getting started
 ## Background
 
 ### MMR
-A [Merkle mountain range](https://docs.grin.mw/wiki/chain-state/merkle-mountain-range) (MMR) is an alternative to a Merkle tree. Merkle mountain ranges are append-only data structures where leaves are added from left to right, adding a parent as soon as two leaves exist. Unlike Merkle trees, an MMR does not need to be perfectly balanced yet still allows for efficient Merkle proofs of membership. In this document, we will refer use the following notation to represent an MMR with a given set of leaves $M \leftarrow MMR(leaves = \{l_1, ..., l_k\})$ and we will refer to the MMR root as $r \leftarrow M.root$.
+A [Merkle mountain range](https://docs.grin.mw/wiki/chain-state/merkle-mountain-range) (MMR) is an alternative to a Merkle tree. Merkle mountain ranges are append-only data structures where leaves are added from left to right, adding a parent as soon as two leaves exist. Unlike Merkle trees, an MMR does not need to be perfectly balanced yet still allows for efficient Merkle proofs of membership. In this document, we will use the following notation to represent an MMR with a given set of leaves $M \leftarrow MMR(leaves = \{l_1, ..., l_k\})$ and we will refer to the MMR root as $r \leftarrow M.root$.
 
 In the same way as Merkle trees, an MMR allows for Merkle proofs to be constructed and verified. For an MMR $M \leftarrow MMR.New(leaves = \{l_1, ..., l_k\})$, a Merkle proof that $l_j$ is a leaf in the MMR is $\pi \leftarrow MMR.Prove(M.Leaves, l_j, j)$
 
@@ -52,9 +52,9 @@ Where the setup function takes some security parameter and produces a seed and $
 
 ## Protocol
 
-This solution is inspired by the [Hours of Horus](https://eprint.iacr.org/2021/715) concept by Zindros It is a new kind of keyless crypto wallet that allows the user to authenticate by providing knowledge of correct OTP codes. This wallet exists as a new type of keyless onchain account called a complete proxy. We make several improvements on the original protocol as outlined by Zindros. Specifically, rather than leveraging Witness Encryption, which is as of yet impractical, we use timelock encryption as defined above. Further, we use a Merkle mountain range over a Merkle tree, allowing for us to specify an arbitrary number of OTP codes.
+This solution is inspired by the [Hours of Horus](https://eprint.iacr.org/2021/715) concept by Zindros. It is a new kind of keyless crypto wallet that allows the user to authenticate by providing knowledge of correct OTP codes. This wallet exists as a new type of keyless onchain account called a complete proxy. We make several improvements on the original protocol as outlined by Zindros. Specifically, rather than leveraging Witness Encryption, which is as of yet impractical, we use timelock encryption as defined above. Further, we use a Merkle mountain range over a Merkle tree, allowing us to specify an arbitrary number of OTP codes.
 
-The protocol functions within a Prover-Verifier framework, where the prover convinces the verifier it has future knowledge of timelock encrypted OTP codes. In practice, the 'prover' is an end user and the 'verifier' is the blockchain runtime runtime. We assume there is an eventually consistent gossip protocol that ensures messages are relayed to all participants by some upper bounded interval. The Murmur protocol consists of four functions, the prover functions: **Create**, **PrepareExecute** and verifier functions: **VerifyCreate**, **VerifyExecute**. In the future we will expand this to include **Update** and **Recovery** capabilities. Assume we are working over an elliptic curve $\mathbb{E}(\mathbb{F}_p)$ for a finite field $\mathbb{F}_p$ of prime order. Also assume we are using type III pairings. Let $G \in \mathbb{G}_1$ be a generator and $seed \in \{0, 1\}^*$. 
+The protocol functions within a Prover-Verifier framework, where the prover convinces the verifier it has future knowledge of timelock encrypted OTP codes. In practice, the 'prover' is an end user and the 'verifier' is the blockchain runtime. We assume there is an eventually consistent gossip protocol that ensures messages are relayed to all participants by some upper bounded interval. The Murmur protocol consists of four functions, the prover functions: **Create**, **PrepareExecute** and verifier functions: **VerifyCreate**, **VerifyExecute**. In the future we will expand this to include **Update** and **Recovery** capabilities. Assume we are working over an elliptic curve $\mathbb{E}(\mathbb{F}_p)$ for a finite field $\mathbb{F}_p$ of prime order. Also assume we are using type III pairings. Let $G \in \mathbb{G}_1$ be a generator and $seed \in \{0, 1\}^*$. 
 
 For a future block $b$, we define:
 
@@ -91,7 +91,7 @@ sequenceDiagram
 1. **Create**
 $(root, \{(b, ct_b)\}_{b \in B}) \xleftarrow{R} Create(seed, B)$ where $B = \{b_1, ..., b_k\}$ is a limited block schedule
 
-    The client-side begins by producing an input 'seed', an any length string (e.g. a password), and a 'block schedule' $B$. The block schedule determines the *session* for the murmur wallet - the future block numbers when the wallet is usable. To be precise, an otp code is generated for each of the input block numbers' identities. In a Murmur wallet, an OTP code can be 'consumed' on a 'just-in-time' basis, where proof of knowledge of otp codes are submitted just before the expected block is finalized (for which it is encrypted). After this point, point the otp code should be considered expired (as it is essentially public information at this point). A wallet owner can consume this code exactly once before its expiration by proving knowledge of the code to the runtime. Thus, the size of the mmr describes the initial number of total transactions that the user can submit with this wallet before a wallet update is required.
+    The client-side begins by producing an input 'seed', an any length string (e.g. a password), along with a 'block schedule' $B$. The block schedule determines the *session* for the murmur wallet - the future block numbers when the wallet is usable. To be precise, an OTP code is generated for each of the input block numbers' identities. In a Murmur wallet, an OTP code can be 'consumed' on a 'just-in-time' basis, where a proof of knowledge of a future OTP code is submitted just before the expected block is finalized (for which it is encrypted). After this point, the OTP code should be considered expired (as it is essentially public information at this point). A wallet owner can consume this code exactly once before its expiration by proving knowledge of the code to the runtime. Thus, the size of the MMR describes the initial number of total transactions that the user can submit with this wallet before a wallet update is required.
 
     $$
         \{OTP_i\}_{i \in [n]} \leftarrow \{\mathcal{G}(seed, b_i)\}_{i \in [n]} \\
@@ -103,12 +103,12 @@ $(root, \{(b, ct_b)\}_{b \in B}) \xleftarrow{R} Create(seed, B)$ where $B = \{b_
 
     The user then gossips the data to the *verifier* (aka the Runtime). The prover also stores a map $\{(b_i, pos_i)\}_{i \in [n]}$ mapping block numbers to positions in the MMR. The secret keys should be destroyed immediately.
     
-    The MMR data can be added to some offchain storage, such as IPFS or simply on the user’s device. In particular, we will assume we have a mapping of block number to leaf position for which the wallet is valid. This will useful later on when accessing the MMR data to generate a Merkle proof. 
+    The MMR data can be added to some offchain storage, such as IPFS or simply on the user’s device. In particular, we will assume we have a mapping of block number to leaf position for which the wallet is valid. This will be useful later on when accessing the MMR data to generate a Merkle proof. 
     
 2. **VerifyCreate**:
     The prover stores a mapping between a well-known `name` and MMR roots, called the `Registry`. The verify create function:
     1. checks if the `name` is unique by querying the registry. If not, then abort.
-    2. add the name and proxy details to the Registry, mapping name to self-reported MMR root and MMR size.
+    2. adds the name and proxy details to the Registry, mapping name to self-reported MMR root and MMR size.
 
     $$
         r \leftarrow Registry.Get(name) \\
@@ -154,16 +154,26 @@ To investigate:
 In which ways is a wallet vulnerable?
 
 - if the IDN stops producing randomness then the wallet is unusable
-- if the IDN's security is compromised then wallet security is comrpomised as well
+- if the IDN's security is compromised then wallet security is compromised as well
     - so some centralization due to reliance on IDN
     - however, the IDN is a decentralized network itself, reducing the risks posed by centralization
 
 
 ## Future Work
-This type of wallet requires that murmur wallet user transactions are signed on behalf of an origin with enough funding to cover any resultant transaction fees. While we do not address it in this work, we leave it as an open task to address a potential paymaster scheme. This also allows for KYC or other such mechanisms to easily be established (e.g. if there is a semi-centralized API required to sign transction).
 
-- Performance Improvements
-    - batch verification for execution and updates 
-        - what if we used a Verkle Mountain range instead? 
-        - This could let us represent many murmur wallets with a single data structure
-        - also a VMR allows for more efficient 'multiproofs', so I suppose you could efficiently prove a set of murmur wallets, connected within a VMR, can efficiently be proved in a batch verification scenario 
+his type of wallet requires that Murmur wallet user transactions be signed by an origin with sufficient funds to cover any transaction fees incurred during the execution of Murmur extrinsics. 
+
+However, the protocol is designed to be flexible, allowing any valid signed origin and even enabling the option to set these transaction fees to zero. This flexibility supports a range of solutions depending on the specific use case. For example:
+
+- **A paymaster model** could be implemented, where a third party sponsors the transaction fees. This approach could facilitate KYC or similar mechanisms, particularly when a semi-centralized API is needed to sign transactions.
+
+- **An ephemeral origin** could be created specifically for individual transactions, allowing zero-fee Murmur transactions while enhancing anonymity. These temporary origins could be generated and destroyed for each transaction, adding an extra layer of privacy.
+In this work, we have opted for a straightforward paymaster scheme, where Alice acts as the sponsor. However, expanding this solution to support additional models remains an open area for further development.
+
+- We will investigate usage of **unsigned origins** rather than requiring users to rely on a third party or light client to obtain a signature. In this approach, murmur wallets simply send a transaction to the chain and verification of the sender is handled completely by the verification logic in the Murmur pallet.
+
+- **Performance Improvements**
+    - Implementing batch verification for execution and updates 
+        - Consider the potential of using a Verkle Mountain Range (VMR) instead. 
+        - This approach could allow the representation of multiple Murmur wallets within a single data structure.
+        - Additionally, VMR enables more efficient 'multiproofs,' which could significantly optimize batch verification by proving a set of Murmur wallets, all interconnected within the VMR, in a more streamlined and efficient manner.

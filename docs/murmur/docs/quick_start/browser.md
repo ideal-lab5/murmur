@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Browser Integration
 
-Murmur can be easily integrated into web applications with [murmur.js](https://github.com/ideal-lab5/murmur.js), a javascript wrapper that allows you to communicate with the `murmur-api`. Take a look at the [sequence diagram](#sequence-diagram) to see the end-to-end user flow.
+Murmur can be easily integrated into web applications with [murmur.js](https://github.com/ideal-lab5/murmur.js), a javascript wrapper that simplifies communication with the `murmur-api`. Take a look at the [sequence diagram](#sequence-diagram) to see the end-to-end user flow.
 
 ## Setup
 To get started, create a new javascript-based project (e.g. `npx init`). Then install the following dependencies
@@ -15,18 +15,17 @@ npm i @ideallabs/murmur.js axios @polkadot/api
 
 (Optional) Run a local IDN Node
 
-If you want to develop locally, you can run a local Ideal network node with Docker
+If you want to develop locally, you can run a local Ideal Network node with Docker
 
 ``` shell
 docker pull ideallabs/etf@latest
 docker run -p 9944:9944 ideallabs/etf --tmp --dev --alice --unsafe-rpc-external
 ```
 
-We will update this guide when we have finalized the DNS and such for a hosted node.
-
+*This guide will be updated once the DNS and related configurations for a hosted node have been finalized.*
 ---
 
-Configure setup axios and polkadotjs instances. We present a useful default here but there are many different ways an application may want to do this.
+Configure setup axios and polkadot.js instances. We present a useful default here but there are many different ways an application may want to do this.
 
 ``` js
 /* Polkadot API initialization */
@@ -52,7 +51,9 @@ const murmurClient = new MurmurClient(httpClient, api, alice)
 console.log('MurmurClient initialized')
 ```
 
-Then initialize the murmur.js library, a signer **must** be specified. Murmur wallet holders cannot sign messages by themselves currently. In the future, we will modify this to use an embedded *light client*, allowing users to construct ephemeral signing keys on-demand rather than relying on externally owned accounts to sign on their behalf.
+Then initialize the murmur.js library, a signer can be specified else it falls back to `Alice`. Murmur wallets cannot sign messages by themselves and must rely on a signer. It should be noted that Murmur wallets can also be used with the Ideal Network's [timelocked transactions](https://docs.idealabs.network) mechanism to ensure privacy of the transaction when signed by another origin.
+
+In [future work](../learn/protocol#future-work), we will investigate usage of an embedded *light client* instead, to construct ephemeral signing keys on-demand to sign on their behalf.
 
 ```js
 import { MurmurClient } from "@ideallabs/murmur.js";
@@ -63,7 +64,7 @@ const client = new MurmurClient(httpClient, this.api, alice)
 
 ## Authenticate (get a seed)
 
-The `authenticate` function enhances a user's password with greater entropy and returns a sufficient seed to create or execute a murmur wallet as a secure session cookie.
+The `authenticate` function enhances a user's password with greater entropy and returns a sufficient seed to create or execute a Murmur wallet as a secure session cookie.
 
 ``` js
 await murmur.authenticate(username, password)
@@ -85,7 +86,7 @@ murmur.new(validity, (result) => {
 
 ## Execute a Murmur Wallet
 
-To execute a call, first you must construct a valid runtime call with polkadotjs and pass it as a parameter to the execute function. For example, a balance transfer looks like
+To execute a call, first you must construct a valid runtime call with polkadot.js and pass it as a parameter to the execute function. For example, a balance transfer looks like
 
 ``` js
 // use polkadotjs to construct some call
@@ -106,7 +107,7 @@ murmurService.executeTransaction(tx, (result) => {
 
 ## Inspect Murmur wallets
 
-Murmur wallets can easily be queried using the polkadot.js ApiPromise, not explicitly through the murmur.js library. Given a potential `name` of a murmur wallet, it's address and balance can be found with:
+Murmur wallets can easily be queried using the polkadot.js ApiPromise, not explicitly through the murmur.js library. Given a potential `name` of a Murmur wallet, it's address and balance can be found with:
 
 ``` js
 const username = 'some_name';
@@ -132,6 +133,6 @@ You can also check out the [murmur discord bot](./discord.md), a bot enabling Di
 
 ## Sequence Diagram
 
-The diagram below depicts the sequence of events and communication between each component of the system when authenticating with the API, creating a wallet, and executing calls. The reader should note that the murmur API does **not** sign calls and know anything about the chain, it is stateless and permisionless and its database has open read access.
+The diagram below depicts the sequence of events and communication between each component of the system when authenticating with the API, creating a wallet, and executing calls. The reader should note that the Murmur API does **not** sign calls or know anything about the chain, it is permisionless and its database has open read access.
 
 ![sequence_diagram](../../assets/murmur_seq_diagram.drawio.png)
