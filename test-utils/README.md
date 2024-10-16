@@ -1,6 +1,6 @@
 # Murmur test utilities
 
-Various test utilities for murmur.
+Various test utilities for Murmur.
 
 ## Contributing
 
@@ -8,7 +8,7 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 ## License
 
-This project is licensed under the Apache-2.0. See the [LICENSE](../LICENSE) file for details.
+This project is licensed under the Apache-2.0. See the [LICENSE](./LICENSE) file for details.
 
 ## Contact
 
