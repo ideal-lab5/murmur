@@ -1,6 +1,6 @@
 # Murmur Docs
 
-This is the official documentation for the murmur protocol.
+This is the official documentation for the Murmur protocol.
 
 This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
 
@@ -41,3 +41,15 @@ $ GIT_USER=<Your GitHub username> yarn deploy
 ```
 
 If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the Apache-2.0. See the [LICENSE](../../LICENSE) file for details.
+
+## Contact
+
+For any inquiries, please contact [Ideal Labs](https://idealabs.network).

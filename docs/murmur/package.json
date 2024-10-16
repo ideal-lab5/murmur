@@ -1,7 +1,8 @@
 {
-  "name": "murmur",
-  "version": "0.0.0",
+  "name": "murmur-docs",
+  "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",

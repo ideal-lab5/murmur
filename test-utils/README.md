@@ -1,6 +1,6 @@
 # Murmur test utilities
 
-Various test utilities for murmur.
+Various test utilities for Murmur.
 
 ## Contributing
 
