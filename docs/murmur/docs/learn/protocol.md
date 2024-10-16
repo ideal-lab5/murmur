@@ -36,7 +36,9 @@ ct \xleftarrow{R} TLE(m, ID(\omega), sk) \\
 m \xleftarrow{R} TLD(ct, f_\mathcal{C}(\omega, AUX))
 $$
 
+<div style={{ textAlign: 'center' }}>
 ![unnamed](https://hackmd.io/_uploads/H10vVNk6A.png)
+</div>
 
 When discussing timelock encryption, we will consider the CRC implemented as a blockchain's finality. As such, we will interchangeably use 'time' and 'block height' or 'block number'.
 
@@ -72,6 +74,7 @@ For a future block $b$, we define:
 
 The protocol functions in sequential rounds of communication between prover and verifier, where the prover (end user) first computes a function which is then verified by the verifier (runtime). The runtime authorizes wallet (read: murmur proxy) creation anytime a unique name is provided, with no verification of the root, simply storing it in memory.
 
+<div style={{ textAlign: 'center' }}>
 ```mermaid
 sequenceDiagram
     participant Prover
@@ -85,6 +88,7 @@ sequenceDiagram
     Prover->>Verifier: Gossip
     Verifier->>Verifier: VerifyExecute
 ```
+</div>
 
 ### Protocol Details
 

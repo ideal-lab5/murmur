@@ -48,7 +48,7 @@ const config = {
           // Remove this to remove the "edit this page" links.
           editUrl:
             'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-          remarkPlugins: [math, { strict: false }],
+          remarkPlugins: [math],
           rehypePlugins: [katex],
         },
         blog: {
@@ -75,19 +75,18 @@ const config = {
 
   stylesheets: [
     {
-      href: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css',
+      href: '/katex/katex.min.css',
       type: 'text/css',
-      // integrity:
-      //   'sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM',
+      integrity:
+        'sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X',
       crossorigin: 'anonymous',
     },
   ],
-  // stylesheets: [
-  //   {
-  //     href: './static/katex/katex.min.css',
-  //     type: 'text/css',
-  //   },
-  // ],
+
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
 
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
@@ -103,7 +102,7 @@ const config = {
         items: [
           {
             type: 'docSidebar',
-            sidebarId: 'customSidebar',
+            sidebarId: 'docsSidebar',
             position: 'left',
             label: 'Docs',
           },
