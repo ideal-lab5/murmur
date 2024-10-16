@@ -8,30 +8,30 @@ const FeatureList = [
     Svg: require('@site/static/img/no_key.svg').default,
     description: (
       <>
-        Murmur wallets are truly **keyless** - 
+        Murmur wallets are truly <b>keyless</b> - 
         users are not responsible for storing and securing mnemonics or secret keys. 
         The protocol requires no keystore or key recovery (e.g. threshold signing) for individual wallets.
       </>
     ),
   },
   {
-    title: 'Create In-App Wallets',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: 'Non-Custodial',
+    Svg: require('@site/assets/eye-crossed.svg').default,
     description: (
       <>
         Murmur lets you create in-app wallets that are entirely non-custodial and under user control. It lets developers easily
-        add web3 capabilities to applications without the burden of key management. It enables seamless account abstraction for users
+        add web3 capabilities to applications without the burden of key management, enabling seamless account abstraction for users
         without sacrificing decentralization or other core ethos of web3.
       </>
     ),
   },
   {
     title: 'Seamless Cross-Platform Interoperbility',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    Svg: require('@site/assets/x-platform.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Murmur is versatile and can be integrated in various contexts:
+        in the browser, in a bot, a standalone client or any other web-enabled context using Javascript or Rust. 
       </>
     ),
   },

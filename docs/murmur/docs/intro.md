@@ -41,7 +41,7 @@ Murmur sidesteps these disadvantages by relying on the Ideal Network's [randomne
 
 ## Getting Started
 
-The murmur protocol is very flexible and can be used in various contexts, each with different trust models. Start [here](./quick_start/protocol.md) to learn more about the inner workings of the murmur protocol, or just jump into the code on [github](https://github.com/ideal-lab5/murmur).
+The murmur protocol is very flexible and can be used in various contexts, each with different trust models. Start [here](./learn/protocol.md) to learn more about the inner workings of the murmur protocol, or just jump into the code on [github](https://github.com/ideal-lab5/murmur).
 
 **From a Browser**
 Murmur can be used from the browser by relying on the murmur.js library to communicate with an API, allowing for the creation and execution of in-app wallets. The [murmur-api](https://github.com/ideal-lab5/murmur-api) is a stateless API that simply outsources the computation required to compute and encrypt OTP codes and merkle proofs. [Murmur.js](https://github.com/ideal-lab5/murmur.js) is a javascript library that lets developers easily integrate keyless crypto wallets into their applications. In conjunction with [polkadot.js](https://polkadot.js.org/docs/api), it allows developers to easily add a 'wallet-as-a-service' mechanism to their applications. 
