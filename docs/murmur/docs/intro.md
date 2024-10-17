@@ -11,9 +11,9 @@ Noun. *a low indistinct but often continuous sound*
 
 ---
 
-Murmur is a **keyless crypto wallet protocol** powered by the [Ideal Network](https://docs.idealabs.network) (IDN). Using **timelock encryption** and secure time-based [one-time password](https://www.techtarget.com/searchsecurity/definition/one-time-password-OTP) (OTP) generation, **murmur** allows users to create and execute secure crypto wallets with no mnemonic or secret key. Murmur allows users to access crypto wallets without needing a secret key or mnemonic - it is a truly keyless wallet solution.
+Murmur is a **keyless crypto wallet protocol** powered by the [Ideal Network](https://docs.idealabs.network) (IDN). Using **timelock encryption** and secure time-based [one-time password](https://www.techtarget.com/searchsecurity/definition/one-time-password-OTP) (OTP) generation, **murmur** allows users to create and execute secure crypto wallets with no mnemonic or secret key - it is a truly keyless wallet solution. The protocol is designed to be versatile and can be used in a myriad of ways, from [a terminal](./quick_start/local.md) to [twitch chats](./quick_start/twitch.md).
 
-Murmur wallets can be accessed seamlessly across web-enabled devices, providing a plug-and-play solution for app developers to easily integrate web3 capabilities into applications and services with no additional infrastructure or overhead. Murmur wallets can be used by installing a **standalone wallet client** or by using our GDPR-compliant "MMR-as-a-Service" **HTTP API**, which allows you to easily create in-app wallets with seamless interoperability across browsers and other HTTP clients. 
+Murmur wallets can be accessed seamlessly across web-enabled devices, providing a frictionless plug-and-play solution for app developers to integrate web3 capabilities into applications and services without any additional infrastructure or overhead. Murmur wallets can be used by installing a **standalone wallet client** or by using our **HTTP API**, which allows you to easily create in-app wallets with seamless interoperability across browsers and other HTTP clients. 
 
 ## Why Murmur?
 
@@ -46,7 +46,7 @@ The murmur protocol is very flexible and can be used in various contexts, each w
 **From a Browser or JS app**
 Murmur can be used from any web-enabled javascript context by relying on the **murmur.js** library to communicate with the **murmur-api**, allowing for the creation and execution of in-app wallets. The [murmur-api](https://github.com/ideal-lab5/murmur-api) is a permissionless HTTP API that simply outsources the computation required to compute and encrypt OTP codes and merkle proofs. [Murmur.js](https://github.com/ideal-lab5/murmur.js) is a javascript library that lets developers easily integrate keyless crypto wallets into their applications. In conjunction with [polkadot.js](https://polkadot.js.org/docs/api), it developers can add a 'wallet-as-a-service' mechanism to their applications with minimal effort. 
 
-Check out the [browser integration guide](./quick_start/browser.md) to learn how to integrate murmur into your applications by communicating with the api. See out the library in action by exploring the [murmur-dapp](https://github.com/ideal-lab5/murmur-dapp/) and [murmur discord bot](https://github.com/ideal-lab5/murmur-discord-bot).
+Check out the [browser integration guide](./quick_start/browser.md) to learn how to integrate murmur into your applications by communicating with the api. See out the library in action by exploring the [murmur-dapp](https://github.com/ideal-lab5/murmur-dapp/) and [murmur-bots](https://github.com/ideal-lab5/murmur-bots/) repo. which includes both Discord and Twitch bots.
 
 **Standalone Client**
 You can also run the murmur wallet using a standalone client. Try the [cli](./quick_start/local.md) for a terminal based client that allows you to create a wallet and execute basic balance transfers.

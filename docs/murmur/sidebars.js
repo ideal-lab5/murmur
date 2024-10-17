@@ -26,6 +26,7 @@ const sidebars = {
               'quick_start/local',
               'quick_start/browser',
               'quick_start/discord',
+              'quick_start/twitch',
             ],
     },
     {

@@ -83,7 +83,7 @@ This is an HTTP connector to the `murmur-api`. It encapsulates communication wit
 
 **Examples** 
 - The [murmur-cli](https://github.com/ideal-lab5/murmur/tree/main/lib/src/bin/murmur) is a terminal-based way to use murmur. 
-- The murmur.js library can be used in various javascript based contexts. For example, the [murmur-dapp](https://github.com/ideal-lab5/murmur-dapp/) is a next.js application that demonstrates usage the library in a browser-based context, while the [murmur-discord-bot](https://github.com/ideal-lab5/murmur-discord-bot) functions in a node.js environment, allowing for murmur wallets to be used within Discord.
+- The murmur.js library can be used in various javascript based contexts. For example, the [murmur-dapp](https://github.com/ideal-lab5/murmur-dapp/) is a next.js application that demonstrates usage the library in a browser-based context, while the [murmur-bots](https://github.com/ideal-lab5/murmur-bots) functions in a node.js environment. It includes bots that allow server/chat specific Discord and Twitch bots to be created.
 
 
 ### Pallets
@@ -101,6 +101,7 @@ Explore the [pallets repo](https://github.com/ideal-lab5/pallets/tree/main) to l
 
 ## Vulnerabilities, Limitations, Assumption
 
+- Currently there is an issue where sometimes calls to execute the wallet are badly timed and reach the network at the wrong block, which results in the transaction failing. We are still investigating this issue of transaction timing, and are exploring the introduction of retry logic into the murmur libraries. 
 - Murmur wallets are inherently ephemeral. We currently have not implemented any update functionality, meaning that in its current state all Murmur wallets expire at some point. We will address this in the future.
 - Murmur wallets are not recoverable currently. If the user loses their username/seed then they have effectively lost access to their wallet. 
 - There has been no formal security audit of the IDN or Murmur.
