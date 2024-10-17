@@ -36,7 +36,7 @@ Options:
 You can use docker to easily run a local IDN validator node (with RPC exposed on localhost:9944) with:
 
 ``` shell
-docker pull ideallabs/etf@latest
+docker pull ideallabs/etf:latest
 docker run -p 9944:9944 ideallabs/etf --tmp --dev --alice --unsafe-rpc-external
 ```
 
