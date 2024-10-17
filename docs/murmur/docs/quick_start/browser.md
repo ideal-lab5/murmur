@@ -18,7 +18,7 @@ npm i @ideallabs/murmur.js axios @polkadot/api
 If you want to develop locally, you can run a local Ideal Network node with Docker
 
 ``` shell
-docker pull ideallabs/etf@latest
+docker pull ideallabs/etf:latest
 docker run -p 9944:9944 ideallabs/etf --tmp --dev --alice --unsafe-rpc-external
 ```
 

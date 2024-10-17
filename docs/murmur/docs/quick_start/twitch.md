@@ -17,7 +17,7 @@ This is a guide for develoeprs to demosntrate lcoal setup and execution of the T
 This project is in development and requires you run a local IDN node. You can do this easily with Docker by running:
 
 ``` shell
-docker pull ideallabs/etf@latest
+docker pull ideallabs/etf:latest
 docker run -p 9944:9944 ideallabs/etf --tmp --dev --alice --unsafe-rpc-external
 ```
 

@@ -16,7 +16,7 @@ The [murmur-discord-bot](https://github.com/ideal-lab5/murmur-bots/tree/main/dis
 This project is in development and requires you run a local IDN node. You can do this easily with Docker by running:
 
 ``` shell
-docker pull ideallabs/etf@latest
+docker pull ideallabs/etf:latest
 docker run -p 9944:9944 ideallabs/etf --tmp --dev --alice --unsafe-rpc-external
 ```
 
