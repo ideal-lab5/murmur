@@ -30,33 +30,33 @@ pub type Ciphertext = Vec<u8>;
 /// A leaf in the MMR
 /// The payload is an opaque, any-length vec
 #[derive(
-    Eq, PartialEq, Clone, Debug, Default, serde::Serialize, serde::Deserialize, Encode, Decode,
+	Eq, PartialEq, Clone, Debug, Default, serde::Serialize, serde::Deserialize, Encode, Decode,
 )]
 pub struct Leaf(pub Vec<u8>);
 impl From<Vec<u8>> for Leaf {
-    fn from(data: Vec<u8>) -> Self {
-        let mut hasher = sha3::Sha3_256::default();
-        hasher.update(&data);
-        let hash = hasher.finalize();
-        Leaf(hash.to_vec().into())
-    }
+	fn from(data: Vec<u8>) -> Self {
+		let mut hasher = sha3::Sha3_256::default();
+		hasher.update(&data);
+		let hash = hasher.finalize();
+		Leaf(hash.to_vec().into())
+	}
 }
 
 /// Merge leaves together with a sha256 hasher
 #[derive(Debug)]
 pub struct MergeLeaves;
 impl Merge for MergeLeaves {
-    type Item = Leaf;
-    fn merge(lhs: &Self::Item, rhs: &Self::Item) -> MMRResult<Self::Item> {
-        let mut hasher = sha3::Sha3_256::default();
-        hasher.update(&lhs.0);
-        hasher.update(&rhs.0);
-        let hash = hasher.finalize();
-        Ok(Leaf(hash.to_vec().into()))
-    }
+	type Item = Leaf;
+	fn merge(lhs: &Self::Item, rhs: &Self::Item) -> MMRResult<Self::Item> {
+		let mut hasher = sha3::Sha3_256::default();
+		hasher.update(&lhs.0);
+		hasher.update(&rhs.0);
+		let hash = hasher.finalize();
+		Ok(Leaf(hash.to_vec().into()))
+	}
 }
 
 /// Something that builds unique identities (e.g. using crypto hash function) for any block number
 pub trait IdentityBuilder<BlockNumber> {
-    fn build_identity(at: BlockNumber) -> Identity;
+	fn build_identity(at: BlockNumber) -> Identity;
 }
