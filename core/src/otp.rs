@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-use totp_rs::{Secret, TOTP, Algorithm};
 use alloc::{
     vec::Vec,
     string::String,
 };
+use totp_rs::{Secret, TOTP, Algorithm};
+use zeroize::Zeroize;
 
 #[derive(Debug)]
 pub enum OTPError {
@@ -37,17 +38,18 @@ impl BOTPGenerator {
     ///
     /// * `seed`: The seed used to generate OTP codes
     ///
-    pub fn new(seed: Vec<u8>) -> Result<Self, OTPError> {
-        let secret = Secret::Raw(seed.to_vec()).to_bytes()
+    pub fn new(mut seed: Vec<u8>) -> Result<Self, OTPError> {
+        let mut secret = Secret::Raw(seed.clone()).to_bytes()
             .map_err(|_| OTPError::InvalidSecret)?;
+        seed.zeroize();
         let totp = TOTP::new(
             Algorithm::SHA256, // algorithm
             6,                 // num digits
             1,                 // skew
             1,                 // step
-            secret             // secret
+            secret.clone()             // secret
         ).map_err(|_| OTPError::InvalidSecret)?;
-
+        secret.zeroize();
         Ok(BOTPGenerator { totp })
     }
 

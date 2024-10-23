@@ -24,6 +24,9 @@ use std::fs::File;
 use std::time::Instant;
 use subxt_signer::sr25519::dev;
 use thiserror::Error;
+use rand_core::OsRng;
+use rand_chacha::ChaCha20Rng;
+use ark_std::rand::SeedableRng;
 
 /// Command line
 #[derive(Parser)]
@@ -88,7 +91,9 @@ pub const MMR_STORE_FILEPATH: &str = "mmr_store";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let before = Instant::now();
-    let ephem_msk = [1; 32];
+    
+    // The OsRng is the canonical source of randomness
+    let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
 
     let (client, current_block_number, round_pubkey_bytes) = idn_connect().await?;
 
@@ -106,9 +111,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let (call, mmr_store) = create(
                 args.name.as_bytes().to_vec(),
                 args.seed.as_bytes().to_vec(),
-                ephem_msk,
+                0,
                 schedule,
                 round_pubkey_bytes,
+                &mut rng,
             )
             .map_err(|_| CLIError::MurmurCreationFailed)?;
             // 3. add to storage
@@ -146,6 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 target_block_number,
                 store,
                 balance_transfer_call,
+                &mut rng,
             )
             .map_err(|_| CLIError::MurmurExecutionFailed)?;
             // submit the tx using alice to sign it

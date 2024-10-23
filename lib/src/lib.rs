@@ -27,6 +27,7 @@ pub use etf::{
     murmur::calls::types::{Create, Proxy},
     runtime_types::node_template_runtime::RuntimeCall,
 };
+use rand_chacha::ChaCha20Rng;
 pub use murmur_core::{
     murmur::{Error, MurmurStore},
     types::BlockNumber,
@@ -63,19 +64,22 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
 pub fn create(
     name: Vec<u8>,
     mut seed: Vec<u8>,
-    mut ephem_msk: [u8; 32],
+    nonce: u64,
     block_schedule: Vec<BlockNumber>,
     round_pubkey_bytes: Vec<u8>,
+    rng: &mut ChaCha20Rng,
 ) -> Result<(TxPayload<Create>, MurmurStore), Error> {
+
     let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
         .map_err(|_| Error::InvalidPubkey)?;
-    let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
+    
+    let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder, ChaCha20Rng>(
         seed.clone(),
         block_schedule.clone(),
-        ephem_msk,
+        nonce,
         round_pubkey,
+        rng,
     )?;
-    ephem_msk.zeroize();
     seed.zeroize();
     let root = mmr_store.root.clone();
 
@@ -107,8 +111,14 @@ pub fn prepare_execute(
     when: BlockNumber,
     store: MurmurStore,
     call: RuntimeCall,
+    rng: &mut ChaCha20Rng,
 ) -> Result<TxPayload<Proxy>, Error> {
-    let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
+    let (proof, commitment, ciphertext, pos) = store.execute(
+        seed.clone(), 
+        when, 
+        call.encode(),
+        rng,
+    )?;
     seed.zeroize();
     let size = proof.mmr_size();
     let proof_items: Vec<Vec<u8>> = proof
@@ -170,22 +180,23 @@ mod tests {
 
     use super::*;
     use subxt::tx::TxPayload;
+    use rand_core::{OsRng, SeedableRng};
 
     #[test]
     pub fn it_can_create_an_mmr_store_and_call_data() {
         let name = b"name".to_vec();
         let seed = b"seed".to_vec();
-        let ephem_msk = [1; 32];
         let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
         let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
+        let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
         let (call, mmr_store) = create(
             name.clone(),
             seed,
-            ephem_msk,
+            0,
             block_schedule,
             double_public_bytes,
-        )
-        .unwrap();
+            &mut rng,
+        ).unwrap();
 
         let expected_call = etf::tx().murmur().create(
             mmr_store.root.0,
@@ -196,28 +207,28 @@ mod tests {
         let actual_details = call.validation_details().unwrap();
         let expected_details = expected_call.validation_details().unwrap();
 
-        assert_eq!(actual_details.pallet_name, expected_details.pallet_name,);
+        assert_eq!(actual_details.pallet_name, expected_details.pallet_name);
 
-        assert_eq!(actual_details.call_name, expected_details.call_name,);
+        assert_eq!(actual_details.call_name, expected_details.call_name);
 
-        assert_eq!(actual_details.hash, expected_details.hash,);
+        assert_eq!(actual_details.hash, expected_details.hash);
     }
 
     #[test]
     pub fn it_can_prepare_valid_execution_call_data() {
         let name = b"name".to_vec();
         let seed = b"seed".to_vec();
-        let ephem_msk = [1; 32];
         let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
         let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-        let (_call, mmr_store) = create(
+        let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
+        let (call, mmr_store) = create(
             name.clone(),
             seed.clone(),
-            ephem_msk,
+            0,
             block_schedule,
             double_public_bytes,
-        )
-        .unwrap();
+            &mut rng,
+        ).unwrap();
 
         let bob = subxt_signer::sr25519::dev::bob().public_key();
         let bob2 = subxt_signer::sr25519::dev::bob().public_key();
@@ -237,18 +248,25 @@ mod tests {
                 },
             );
 
+        let when = 1;
+
         let actual_call = prepare_execute(
             name.clone(),
             seed.clone(),
-            1,
+            when,
             mmr_store.clone(),
             balance_transfer_call,
+            &mut rng,
         )
         .unwrap();
 
         let (proof, commitment, ciphertext, _pos) = mmr_store
-            .execute(seed.clone(), 1, balance_transfer_call_2.encode())
-            .unwrap();
+            .execute(
+                seed.clone(), 
+                1, 
+                balance_transfer_call_2.encode(),
+                &mut rng,
+            ).unwrap();
 
         let size = proof.mmr_size();
         let proof_items: Vec<Vec<u8>> = proof
@@ -256,9 +274,10 @@ mod tests {
             .iter()
             .map(|leaf| leaf.0.clone())
             .collect::<Vec<_>>();
+
         let expected_call = etf::tx().murmur().proxy(
             BoundedVec(name),
-            0,
+            when.into(),
             commitment,
             ciphertext,
             proof_items,
