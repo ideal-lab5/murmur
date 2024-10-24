@@ -23,14 +23,14 @@ use zeroize::Zeroize;
 
 #[derive(Debug)]
 pub enum OTPError {
-    /// The secret size is too large
-    InvalidSecret,
+	/// The secret size is too large
+	InvalidSecret,
 }
 
 /// A block based otp generator
 pub struct BOTPGenerator {
-    /// The time-based otp generator
-    totp: TOTP
+	/// The time-based otp generator
+	totp: TOTP,
 }
 
 impl BOTPGenerator {
@@ -57,30 +57,28 @@ impl BOTPGenerator {
     ///
     /// * `block_height`: The block for which the code is valid
     ///
-    pub fn generate(&self, block_height: u32) -> String {
-        self.totp.generate(block_height as u64)
+    pub fn generate(&self, block_height: u64) -> String {
+        self.totp.generate(block_height)
     }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use alloc::vec;
+	use super::*;
+	use alloc::vec;
 
-    #[test]
-    pub fn it_can_generate_otp_codes_with_valid_seed() {
-        let botp = BOTPGenerator::new([1;32].to_vec()).unwrap();
-        let otp_min = botp.generate(0);
-        assert!(otp_min.len() == 6);
+	#[test]
+	pub fn it_can_generate_otp_codes_with_valid_seed() {
+		let botp = BOTPGenerator::new([1; 32].to_vec()).unwrap();
+		let otp_min = botp.generate(0);
+		assert!(otp_min.len() == 6);
 
-        let otp_max = botp.generate(u32::MAX);
-        assert!(otp_max.len() == 6);
-    }
+		let otp_max = botp.generate(u64::MAX);
+		assert!(otp_max.len() == 6);
+	}
 
-    #[test]
-    pub fn it_fails_to_build_otp_generator_with_invalid_seed() {
-        assert!(BOTPGenerator::new(vec![1]).is_err());
-    }
-
+	#[test]
+	pub fn it_fails_to_build_otp_generator_with_invalid_seed() {
+		assert!(BOTPGenerator::new(vec![1]).is_err());
+	}
 }

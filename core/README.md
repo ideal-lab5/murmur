@@ -4,26 +4,45 @@ This library contains the core implementation of the murmur protocol. This imple
 
 ## Build
 
-``` shell
+To build the library, use the following command:
+
+```shell
 cargo build
 ```
 
-The OTP code generator is gated under the "client" feature, so build with:
-``` shell
+The OTP code generator is gated under the "client" feature. To build with this feature enabled, use:
+
+```shell
 cargo build --features "client"
 ```
 
 ## Test
 
-``` shell
+To run the tests, use the following command:
+
+```shell
 cargo test
 ```
 
 The OTP code generator is gated under the "client" feature, so run tests with:
-``` shell
+
+```shell
 cargo test --features "client"
 ```
 
 ## Future Work/Notes
-- There is an 'otpauth' feature that can be enabled on the totp lib. It allows for the inclusion of an issuer and account_name. We can investigate usage of this in the future. https://github.com/constantoine/totp-rs/blob/da78569b0c233adbce126dbe0c35452340fd3929/src/lib.rs#L160
-- Wallet Update logic: Each murmur wallet is ephemeral, since any MMR must be limited in size. We can use a zkp to prove knowledge of the seed in order to allow  the wallet owner to update the wallet by providing a new MMR root.
+
+- **OTPAuth Feature**: There is an 'otpauth' feature that can be enabled on the totp lib. It allows for the inclusion of an issuer and account_name. We can investigate usage of this in the future. [TOTP Library Reference](https://github.com/constantoine/totp-rs/blob/da78569b0c233adbce126dbe0c35452340fd3929/src/lib.rs#L160)
+- **Wallet Update logic**: Each murmur wallet is ephemeral, since any MMR must be limited in size. We can use a zkp to prove knowledge of the seed in order to allow the wallet owner to update the wallet by providing a new MMR root.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the Apache-2.0. See the [LICENSE](../LICENSE) file for details.
+
+## Contact
+
+For any inquiries, please contact [Ideal Labs](https://idealabs.network).

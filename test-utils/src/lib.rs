@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #![no_std]
 
 //! various utilities helpful for testing
 
-use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, TinyBLS377};
-use rand_core::OsRng;
-use ark_serialize::CanonicalSerialize;
 use alloc::vec::Vec;
+use ark_serialize::CanonicalSerialize;
+use rand_core::OsRng;
+use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, TinyBLS377};
 
 extern crate alloc;
 
@@ -29,12 +30,10 @@ pub use murmur_core::otp::BOTPGenerator;
 pub use murmur_core::murmur::MurmurStore;
 
 pub fn get_dummy_beacon_pubkey() -> Vec<u8> {
-    let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
-    let double_public: DoublePublicKey<TinyBLS377> = DoublePublicKey(
-        keypair.into_public_key_in_signature_group().0,
-        keypair.public.0,
-    );
-    let mut bytes = Vec::new();
-    double_public.serialize_compressed(&mut bytes).unwrap();
-    bytes
+	let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
+	let double_public: DoublePublicKey<TinyBLS377> =
+		DoublePublicKey(keypair.into_public_key_in_signature_group().0, keypair.public.0);
+	let mut bytes = Vec::new();
+	double_public.serialize_compressed(&mut bytes).unwrap();
+	bytes
 }

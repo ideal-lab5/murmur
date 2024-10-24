@@ -2610,6 +2610,7 @@ dependencies = [
  "ark-std",
  "ckb-merkle-mountain-range",
  "clap",
+ "hkdf",
  "murmur-core",
  "murmur-test-utils",
  "parity-scale-codec",
