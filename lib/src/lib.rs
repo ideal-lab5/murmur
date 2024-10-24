@@ -15,12 +15,8 @@
  */
 
 use beefy::{known_payloads, Commitment, Payload};
-use hkdf::Hkdf;
 use murmur_core::types::{Identity, IdentityBuilder};
 use serde::Serialize;
-use subxt::{
-	backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig, ext::codec::Encode,
-};
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 use zeroize::Zeroize;
 
@@ -32,6 +28,7 @@ pub use murmur_core::{
 	types::BlockNumber,
 };
 use rand_chacha::ChaCha20Rng;
+use subxt::ext::codec::Encode;
 
 // Generate an interface that we can use from the node's metadata.
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
@@ -60,7 +57,12 @@ pub struct CreateData {
 	pub root: Vec<u8>,
 	/// The size of the MMR
 	pub size: u64,
+    /// The murmur store (map of block nubmer to ciphertext)
 	pub mmr_store: MurmurStore,
+    /// The serialized VRF public key
+    pub public_key_bytes: Vec<u8>,
+    /// The serialized Schnorr signature
+    pub proof_bytes: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -69,8 +71,11 @@ pub struct ProxyData {
 	pub position: u64,
 	/// The hash of the commitment
 	pub hash: Vec<u8>,
+    /// The timelocked ciphertext
 	pub ciphertext: Vec<u8>,
+    /// The Merkle proof items
 	pub proof_items: Vec<Vec<u8>>,
+    /// The size of the Merkle proof
 	pub size: u64,
 }
 
@@ -85,7 +90,7 @@ pub fn create(
 	block_schedule: Vec<BlockNumber>,
 	round_pubkey_bytes: Vec<u8>,
 	rng: &mut ChaCha20Rng,
-) -> Result<CreateData, Error> {
+) -> Result<MurmurStore, Error> {
 	let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
 		.map_err(|_| Error::InvalidPubkey)?;
 
@@ -97,10 +102,7 @@ pub fn create(
 		rng,
 	)?;
 	seed.zeroize();
-
-	let root = mmr_store.root.clone();
-
-	Ok(CreateData { root: root.0, size: mmr_store.metadata.len() as u64, mmr_store })
+	Ok(mmr_store)
 }
 
 /// Return the data needed for the immediate execution of the proxied call.
@@ -133,35 +135,6 @@ pub fn prepare_execute(
 	Ok(ProxyData { position: pos, hash: commitment, ciphertext, proof_items, size })
 }
 
-/// Async connection to the Ideal Network
-/// if successful then fetch data
-/// else error if unreachable
-pub async fn idn_connect(
-) -> Result<(OnlineClient<SubstrateConfig>, BlockNumber, Vec<u8>), Box<dyn std::error::Error>> {
-	println!("🎲 Connecting to Ideal network (local node)");
-	let ws_url = std::env::var("WS_URL").unwrap_or_else(|_| {
-		let fallback_url = "ws://localhost:9944".to_string();
-		println!("⚠️ WS_URL environment variable not set. Using fallback URL: {}", fallback_url);
-		fallback_url
-	});
-
-	let rpc_client = RpcClient::from_url(&ws_url).await?;
-	let client = OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
-	println!("🔗 RPC Client: connection established");
-
-	// fetch the round public key from etf runtime storage
-	let round_key_query = subxt::dynamic::storage("Etf", "RoundPublic", ());
-	let result = client.storage().at_latest().await?.fetch(&round_key_query).await?;
-	let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
-
-	println!("🔑 Successfully retrieved the round public key.");
-
-	let current_block = client.blocks().at_latest().await?;
-	let current_block_number: BlockNumber = current_block.header().number;
-	println!("🧊 Current block number: #{:?}", current_block_number);
-	Ok((client, current_block_number, round_pubkey_bytes))
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -176,7 +149,7 @@ mod tests {
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
 		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
-		let create_data =
+		let mmr_store =
 			create(seed.clone(), 0, block_schedule.clone(), double_public_bytes.clone(), &mut rng)
             .unwrap();
 
@@ -188,8 +161,8 @@ mod tests {
         //     &mut rng,
 		// ).unwrap();
 
-		assert_eq!(create_data.mmr_store.root.0.len(), 32);
-		assert_eq!(create_data.size, 7);
+		assert_eq!(mmr_store.root.0.len(), 32);
+		assert_eq!(mmr_store.size, 7);
 	}
 
 	#[test]
@@ -199,7 +172,7 @@ mod tests {
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
 		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
-		let create_data = create(
+		let mmr_store = create(
             seed.clone(), 
             0, 
             block_schedule, 
@@ -234,7 +207,7 @@ mod tests {
 		let proxy_data = prepare_execute(
 			seed.clone(),
 			when,
-			create_data.mmr_store.clone(),
+			mmr_store.clone(),
 			&balance_transfer_call,
 			&mut rng,
 		)

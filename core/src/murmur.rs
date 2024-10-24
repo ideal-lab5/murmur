@@ -243,6 +243,7 @@ impl MurmurStore {
 /// * `seed`: The value written to the transcript
 /// * `rng`: A CSPRNG
 ///
+#[cfg(feature = "client")]
 fn generate_witness<R: Rng + CryptoRng + Sized>(mut seed: Vec<u8>, mut rng: R) -> [u8; 32] {
     let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
     transcript.write_bytes(&seed);
@@ -259,6 +260,7 @@ fn generate_witness<R: Rng + CryptoRng + Sized>(mut seed: Vec<u8>, mut rng: R) -
 /// * `message`: The message to be timelock encrypted
 /// * `rng`: A CSPRNG
 ///
+#[cfg(feature = "client")]
 fn timelock_encrypt<E: EngineBLS, R: CryptoRng + Rng + Sized>(
     identity: Identity,
     pk: E::PublicKeyGroup,
@@ -335,17 +337,19 @@ pub mod verifier {
 	/// * `nonce`: A nonce value
 	///
 	pub fn verify_update<E: EngineBLS>(
-         serialized_proof: Vec<u8>, 
+        serialized_proof: Vec<u8>, 
         serialized_pubkey: Vec<u8>,
         nonce: u64,
     ) -> Result<bool, VerificationError> {
         // build transcript
         let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
         transcript.write_bytes(&nonce.to_be_bytes());
-        // deserialize proof and pubkey
+        
+		// deserialize proof and pubkey
         let proof = ThinVrfProof::<<E::SignatureGroup as CurveGroup>::Affine>::
 			deserialize_compressed(&mut &serialized_proof[..])
 			.map_err(|_| VerificationError::UnserializableProof)?;
+		
         let pk = PublicKey::<<E::SignatureGroup as CurveGroup>::Affine>::
 			deserialize_compressed(&mut &serialized_pubkey[..])
 			.map_err(|_| VerificationError::UnserializablePubkey)?;
