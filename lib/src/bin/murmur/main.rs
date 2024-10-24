@@ -16,10 +16,16 @@
 
 use clap::{Parser, Subcommand};
 use murmur_lib::{
-	create, etf, idn_connect, prepare_execute, BlockNumber, BoundedVec, MurmurStore, RuntimeCall,
+	create, etf, prepare_execute, BlockNumber, BoundedVec, MurmurStore, RuntimeCall,
 };
+
+use rand_core::{OsRng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use sp_core::crypto::Ss58Codec;
 use std::{fs::File, time::Instant};
+use subxt::{
+	backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig,
+};
 use subxt_signer::sr25519::dev;
 use thiserror::Error;
 
@@ -88,6 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let before = Instant::now();
 
 	let (client, current_block_number, round_pubkey_bytes) = idn_connect().await?;
+    let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
 
 	match &cli.commands {
 		Commands::New(args) => {
@@ -102,16 +109,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			}
 
 			// 2. create mmr
-			let create_data = create(args.seed.as_bytes().to_vec(), schedule, round_pubkey_bytes)
-				.map_err(|_| CLIError::MurmurCreationFailed)?;
+			let mmr_store = create(
+                args.seed.as_bytes().to_vec(),
+                0,
+                schedule,
+                round_pubkey_bytes,
+                &mut rng,
+            ).map_err(|_| CLIError::MurmurCreationFailed)?;
 
 			// 3. add to storage
-			write_mmr_store(create_data.mmr_store.clone(), MMR_STORE_FILEPATH);
+			write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
 
 			// 4. build the call
 			let call = etf::tx().murmur().create(
-				create_data.root,
-				create_data.size,
+				mmr_store.root.0,
+				mmr_store.metadata.keys().len() as u64,
 				BoundedVec(args.name.as_bytes().to_vec()),
 			);
 
@@ -144,6 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 				current_block_number + 1,
 				store,
 				&balance_transfer_call,
+                &mut rng,
 			)
 			.map_err(|_| CLIError::MurmurExecutionFailed)?;
 
@@ -163,6 +176,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	}
 	println!("Elapsed time: {:.2?}", before.elapsed());
 	Ok(())
+}
+
+/// Async connection to the Ideal Network
+/// if successful then fetch data
+/// else error if unreachable
+async fn idn_connect(
+) -> Result<(OnlineClient<SubstrateConfig>, BlockNumber, Vec<u8>), Box<dyn std::error::Error>> {
+	println!("🎲 Connecting to Ideal network (local node)");
+	let ws_url = std::env::var("WS_URL").unwrap_or_else(|_| {
+		let fallback_url = "ws://localhost:9944".to_string();
+		println!("⚠️ WS_URL environment variable not set. Using fallback URL: {}", fallback_url);
+		fallback_url
+	});
+
+	let rpc_client = RpcClient::from_url(&ws_url).await?;
+	let client = OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
+	println!("🔗 RPC Client: connection established");
+
+	// fetch the round public key from etf runtime storage
+	let round_key_query = subxt::dynamic::storage("Etf", "RoundPublic", ());
+	let result = client.storage().at_latest().await?.fetch(&round_key_query).await?;
+	let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
+
+	println!("🔑 Successfully retrieved the round public key.");
+
+	let current_block = client.blocks().at_latest().await?;
+	let current_block_number: BlockNumber = current_block.header().number;
+	println!("🧊 Current block number: #{:?}", current_block_number);
+	Ok((client, current_block_number, round_pubkey_bytes))
 }
 
 /// read an MMR from a file

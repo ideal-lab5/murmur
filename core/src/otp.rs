@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-use alloc::{string::String, vec::Vec};
-use totp_rs::{Algorithm, Secret, TOTP};
+use alloc::{
+    vec::Vec,
+    string::String,
+};
+use totp_rs::{Secret, TOTP, Algorithm};
+use zeroize::Zeroize;
 
 #[derive(Debug)]
 pub enum OTPError {
@@ -30,29 +34,32 @@ pub struct BOTPGenerator {
 }
 
 impl BOTPGenerator {
-	/// Create a new BOTP generator with the given seed
-	///
-	/// * `seed`: The seed used to generate OTP codes
-	pub fn new(seed: Vec<u8>) -> Result<Self, OTPError> {
-		let secret = Secret::Raw(seed.to_vec()).to_bytes().map_err(|_| OTPError::InvalidSecret)?;
-		let totp = TOTP::new(
-			Algorithm::SHA256, // algorithm
-			6,                 // num digits
-			1,                 // skew
-			1,                 // step
-			secret,            // secret
-		)
-		.map_err(|_| OTPError::InvalidSecret)?;
+    /// Create a new BOTP generator with the given seed
+    ///
+    /// * `seed`: The seed used to generate OTP codes
+    ///
+    pub fn new(mut seed: Vec<u8>) -> Result<Self, OTPError> {
+        let mut secret = Secret::Raw(seed.clone()).to_bytes()
+            .map_err(|_| OTPError::InvalidSecret)?;
+        seed.zeroize();
+        let totp = TOTP::new(
+            Algorithm::SHA256, // algorithm
+            6,                 // num digits
+            1,                 // skew
+            1,                 // step
+            secret.clone()             // secret
+        ).map_err(|_| OTPError::InvalidSecret)?;
+        secret.zeroize();
+        Ok(BOTPGenerator { totp })
+    }
 
-		Ok(BOTPGenerator { totp })
-	}
-
-	/// Generate an otp code
-	///
-	/// * `block_height`: The block for which the code is valid
-	pub fn generate(&self, block_height: u32) -> String {
-		self.totp.generate(block_height as u64)
-	}
+    /// Generate an otp code
+    ///
+    /// * `block_height`: The block for which the code is valid
+    ///
+    pub fn generate(&self, block_height: u64) -> String {
+        self.totp.generate(block_height)
+    }
 }
 
 #[cfg(test)]
@@ -66,7 +73,7 @@ mod tests {
 		let otp_min = botp.generate(0);
 		assert!(otp_min.len() == 6);
 
-		let otp_max = botp.generate(u32::MAX);
+		let otp_max = botp.generate(u64::MAX);
 		assert!(otp_max.len() == 6);
 	}
 

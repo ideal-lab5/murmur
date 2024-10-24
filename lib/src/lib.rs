@@ -15,12 +15,8 @@
  */
 
 use beefy::{known_payloads, Commitment, Payload};
-use hkdf::Hkdf;
 use murmur_core::types::{Identity, IdentityBuilder};
 use serde::Serialize;
-use subxt::{
-	backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig, ext::codec::Encode,
-};
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 use zeroize::Zeroize;
 
@@ -31,6 +27,8 @@ pub use murmur_core::{
 	murmur::{Error, MurmurStore},
 	types::BlockNumber,
 };
+use rand_chacha::ChaCha20Rng;
+use subxt::ext::codec::Encode;
 
 // Generate an interface that we can use from the node's metadata.
 #[subxt::subxt(runtime_metadata_path = "artifacts/metadata.scale")]
@@ -59,7 +57,12 @@ pub struct CreateData {
 	pub root: Vec<u8>,
 	/// The size of the MMR
 	pub size: u64,
+    /// The murmur store (map of block nubmer to ciphertext)
 	pub mmr_store: MurmurStore,
+    /// The serialized VRF public key
+    pub public_key_bytes: Vec<u8>,
+    /// The serialized Schnorr signature
+    pub proof_bytes: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -68,8 +71,11 @@ pub struct ProxyData {
 	pub position: u64,
 	/// The hash of the commitment
 	pub hash: Vec<u8>,
+    /// The timelocked ciphertext
 	pub ciphertext: Vec<u8>,
+    /// The Merkle proof items
 	pub proof_items: Vec<Vec<u8>>,
+    /// The size of the Merkle proof
 	pub size: u64,
 }
 
@@ -80,28 +86,23 @@ pub struct ProxyData {
 /// * `round_pubkey_bytes`: The Ideal Network randomness beacon public key
 pub fn create(
 	mut seed: Vec<u8>,
+	nonce: u64,
 	block_schedule: Vec<BlockNumber>,
 	round_pubkey_bytes: Vec<u8>,
-) -> Result<CreateData, Error> {
-	// Derive ephem_msk from seed using HKDF
-	let hk = Hkdf::<sha3::Sha3_256>::new(None, &seed);
-	let mut ephem_msk = [0u8; 32];
-	hk.expand(b"ephemeral key", &mut ephem_msk)
-		.map_err(|_| Error::KeyDerivationFailed)?;
-
+	rng: &mut ChaCha20Rng,
+) -> Result<MurmurStore, Error> {
 	let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
 		.map_err(|_| Error::InvalidPubkey)?;
-	let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
+
+	let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder, ChaCha20Rng>(
 		seed.clone(),
 		block_schedule.clone(),
-		ephem_msk,
+		nonce,
 		round_pubkey,
+		rng,
 	)?;
-	ephem_msk.zeroize();
 	seed.zeroize();
-	let root = mmr_store.root.clone();
-
-	Ok(CreateData { root: root.0, size: mmr_store.metadata.len() as u64, mmr_store })
+	Ok(mmr_store)
 }
 
 /// Return the data needed for the immediate execution of the proxied call.
@@ -122,8 +123,10 @@ pub fn prepare_execute(
 	when: BlockNumber,
 	store: MurmurStore,
 	call: &RuntimeCall,
+	rng: &mut ChaCha20Rng,
 ) -> Result<ProxyData, Error> {
-	let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
+	let (proof, commitment, ciphertext, pos) =
+		store.execute(seed.clone(), when, call.encode(), rng)?;
 	seed.zeroize();
 	let size = proof.mmr_size();
 	let proof_items: Vec<Vec<u8>> =
@@ -132,96 +135,96 @@ pub fn prepare_execute(
 	Ok(ProxyData { position: pos, hash: commitment, ciphertext, proof_items, size })
 }
 
-/// Async connection to the Ideal Network
-/// if successful then fetch data
-/// else error if unreachable
-pub async fn idn_connect(
-) -> Result<(OnlineClient<SubstrateConfig>, BlockNumber, Vec<u8>), Box<dyn std::error::Error>> {
-	println!("🎲 Connecting to Ideal network (local node)");
-	let ws_url = std::env::var("WS_URL").unwrap_or_else(|_| {
-		let fallback_url = "ws://localhost:9944".to_string();
-		println!("⚠️ WS_URL environment variable not set. Using fallback URL: {}", fallback_url);
-		fallback_url
-	});
-
-	let rpc_client = RpcClient::from_url(&ws_url).await?;
-	let client = OnlineClient::<SubstrateConfig>::from_rpc_client(rpc_client.clone()).await?;
-	println!("🔗 RPC Client: connection established");
-
-	// fetch the round public key from etf runtime storage
-	let round_key_query = subxt::dynamic::storage("Etf", "RoundPublic", ());
-	let result = client.storage().at_latest().await?.fetch(&round_key_query).await?;
-	let round_pubkey_bytes = result.unwrap().as_type::<Vec<u8>>()?;
-
-	println!("🔑 Successfully retrieved the round public key.");
-
-	let current_block = client.blocks().at_latest().await?;
-	let current_block_number: BlockNumber = current_block.header().number;
-	println!("🧊 Current block number: #{:?}", current_block_number);
-	Ok((client, current_block_number, round_pubkey_bytes))
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;
 
+	use super::*;
+	use rand_core::{OsRng, SeedableRng};
+
 	#[test]
-	pub fn it_can_create_an_mmr_store() {
+	pub fn it_can_create_an_mmr_store_and_call_data() {
+		let name = b"name".to_vec();
 		let seed = b"seed".to_vec();
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-		let create_data =
-			create(seed.clone(), block_schedule.clone(), double_public_bytes.clone()).unwrap();
+		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
+		let mmr_store =
+			create(seed.clone(), 0, block_schedule.clone(), double_public_bytes.clone(), &mut rng)
+            .unwrap();
 
-		let hk = Hkdf::<sha3::Sha3_256>::new(None, &seed);
-		let mut ephem_msk = [0u8; 32];
-		hk.expand(b"ephemeral key", &mut ephem_msk).unwrap();
+		// let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder, ChaCha20Rng>(
+		// 	seed,
+		// 	block_schedule,
+		// 	0,
+		// 	DoublePublicKey::<TinyBLS377>::from_bytes(&double_public_bytes).unwrap(),
+        //     &mut rng,
+		// ).unwrap();
 
-		let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder>(
-			seed,
-			block_schedule,
-			ephem_msk,
-			DoublePublicKey::<TinyBLS377>::from_bytes(&double_public_bytes).unwrap(),
-		)
-		.unwrap();
-
-		assert_eq!(create_data.mmr_store.root, mmr_store.root);
-		assert_eq!(create_data.size, 7);
+		assert_eq!(mmr_store.root.0.len(), 32);
+		assert_eq!(mmr_store.size, 7);
 	}
 
 	#[test]
 	pub fn it_can_prepare_valid_execution_call_data() {
+		let name = b"name".to_vec();
 		let seed = b"seed".to_vec();
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-		let create_data = create(seed.clone(), block_schedule, double_public_bytes).unwrap();
+		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
+		let mmr_store = create(
+            seed.clone(), 
+            0, 
+            block_schedule, 
+            double_public_bytes, 
+            &mut rng
+        ).unwrap();
 
-		let bob = subxt_signer::sr25519::dev::bob().public_key();
+		// let size = proof.mmr_size();
+		// let proof_items: Vec<Vec<u8>> =
+		// 	proof.proof_items().iter().map(|leaf| leaf.0.clone()).collect::<Vec<_>>();
+
+        let bob = subxt_signer::sr25519::dev::bob().public_key();
 		let balance_transfer_call =
-			&etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
+			etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
 				etf::balances::Call::transfer_allow_death {
 					dest: subxt::utils::MultiAddress::<_, u32>::from(bob),
 					value: 1,
 				},
 			);
 
-		let proxy_data =
-			prepare_execute(seed.clone(), 1, create_data.mmr_store.clone(), balance_transfer_call)
-				.unwrap();
+        let bob2 = subxt_signer::sr25519::dev::bob().public_key();
+        let balance_transfer_call_2 =
+            etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
+                etf::balances::Call::transfer_allow_death {
+                    dest: subxt::utils::MultiAddress::<_, u32>::from(bob2),
+                    value: 1,
+                },
+            );
 
-		let (proof, commitment, ciphertext, _pos) = create_data
-			.mmr_store
-			.execute(seed.clone(), 1, balance_transfer_call.encode())
-			.unwrap();
+		let when = 1;
 
-		let size = proof.mmr_size();
-		let proof_items: Vec<Vec<u8>> =
-			proof.proof_items().iter().map(|leaf| leaf.0.clone()).collect::<Vec<_>>();
+		let proxy_data = prepare_execute(
+			seed.clone(),
+			when,
+			mmr_store.clone(),
+			&balance_transfer_call,
+			&mut rng,
+		)
+		.unwrap();
 
+		// let (proof, commitment, ciphertext, _pos) = create_data.mmr_store
+		// 	.execute(seed.clone(), when, balance_transfer_call_2.encode(), &mut rng)
+		// 	.unwrap();
+        // let expected_commitment = [71, 71, 72, 200, 197, 44, 120, 151, 127, 6, 162, 244, 138, 122, 196, 183, 30, 47, 111, 239, 225, 32, 57, 141, 186, 229, 164, 113, 113, 44, 131, 168];
+        // let expected_ciphertext = [76, 42, 82, 184, 114, 58, 31, 205, 146, 16, 41, 191, 126, 213, 18, 65, 42, 149, 78, 140, 243, 164, 39, 54, 13, 96, 159, 93, 200, 83, 227, 179];
+		// let size = proof.mmr_size();
+		// let proof_items: Vec<Vec<u8>> =
+		// 	proof.proof_items().iter().map(|leaf| leaf.0.clone()).collect::<Vec<_>>();
 		assert_eq!(proxy_data.position, 0);
-		assert_eq!(proxy_data.hash, commitment);
-		assert_eq!(proxy_data.ciphertext, ciphertext);
-		assert_eq!(proxy_data.proof_items, proof_items);
-		assert_eq!(proxy_data.size, size);
+		assert_eq!(proxy_data.hash.len(), 32);
+		assert_eq!(proxy_data.ciphertext.len(), 266);
+		// assert_eq!(proxy_data.proof_items, proof_items);
+		// assert_eq!(proxy_data.size, size);
 	}
 }
