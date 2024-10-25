@@ -606,24 +606,25 @@ mod tests {
 			proof,
 			pk.clone(),			
 			0,
-		).is_ok());
+		).unwrap());
 
+		let mut another_rng = ChaCha20Rng::seed_from_u64(1);
 		let another_murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
             seed.clone(),
             BLOCK_SCHEDULE.to_vec(),
             1,
             same_double_public,
-            &mut rng,
+            &mut another_rng,
         ).unwrap();
 
 		let another_proof = another_murmur_store.proof;
 		// let another_pk = another_murmur_store.public_key;
-		// now verify the proof for nonce = 0
+		// now verify the proof for nonce = 1
 		assert!(verifier::verify_update::<TinyBLS377>(
 			another_proof,
 			pk,			
 			1,
-		).is_ok());
+		).unwrap());
 	}
 
 	#[test]
@@ -654,4 +655,18 @@ mod tests {
 			1,
 		).unwrap());
 	}
+
+	#[test]
+	fn test_generate_witness_determinism() {
+		// Define the same seed input and random number generator state for reproducibility
+		let seed = vec![1, 2, 3, 4, 5, 6, 7, 8];
+		let rng = rand::rngs::StdRng::seed_from_u64(42);
+
+		let witness1 = generate_witness(seed.clone(), rng.clone());
+		let witness2 = generate_witness(seed, rng);
+
+		// Witnesses should match if the function is deterministic
+		assert_eq!(witness1, witness2, "Witnesses should be identical for the same seed");
+	}
+
 }
