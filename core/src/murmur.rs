@@ -182,10 +182,9 @@ impl MurmurStore {
 		mut rng: R,
 	) -> Result<(MerkleProof<Leaf, MergeLeaves>, Vec<u8>, Ciphertext, u64), Error> {
 		if let Some(ciphertext) = self.metadata.get(&when) {
+
 			let commitment = MurmurStore::commit(seed.clone(), when, &call_data.clone(), &mut rng)?;
 			seed.zeroize();
-			// let idx = get_key_index(&self.metadata, &when)
-			// 	.expect("The key must exist within the metadata.");
 			let idx = self.metadata.keys().position(|k| k == &when).expect("The leaf should exist");
 			let pos = leaf_index_to_pos(idx as u64);
 			let mmr = self.to_mmr()?;
@@ -244,7 +243,7 @@ impl MurmurStore {
 /// * `rng`: A CSPRNG
 ///
 #[cfg(feature = "client")]
-fn generate_witness<R: Rng + CryptoRng + Sized>(mut seed: Vec<u8>, mut rng: R) -> [u8; 32] {
+pub fn generate_witness<R: Rng + CryptoRng + Sized>(mut seed: Vec<u8>, mut rng: R) -> [u8; 32] {
     let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
     transcript.write_bytes(&seed);
     seed.zeroize();
@@ -348,11 +347,11 @@ pub mod verifier {
 		// deserialize proof and pubkey
         let proof = ThinVrfProof::<<E::SignatureGroup as CurveGroup>::Affine>::
 			deserialize_compressed(&mut &serialized_proof[..])
-			.map_err(|_| VerificationError::UnserializableProof)?;
+				.map_err(|_| VerificationError::UnserializableProof)?;
 		
         let pk = PublicKey::<<E::SignatureGroup as CurveGroup>::Affine>::
 			deserialize_compressed(&mut &serialized_pubkey[..])
-			.map_err(|_| VerificationError::UnserializablePubkey)?;
+				.map_err(|_| VerificationError::UnserializablePubkey)?;
 			
 		Ok(pk.vrf_verify_detached(transcript, &[], &proof).is_ok())
 	}
@@ -365,6 +364,7 @@ mod tests {
     use w3f_bls::{DoublePublicKeyScheme, TinyBLS377};
     use rand_chacha::ChaCha20Rng;
     use ark_std::rand::SeedableRng;	
+	use ark_serialize::CanonicalDeserialize;	
 
 	/// 
 	pub const BLOCK_SCHEDULE: &[BlockNumber] = &[
@@ -585,6 +585,10 @@ mod tests {
             keypair.public.0,
         );
 
+		let mut bytes = Vec::new();
+		double_public.serialize_compressed(&mut bytes).unwrap();
+		let same_double_public = DoublePublicKey::<TinyBLS377>::deserialize_compressed(&mut &bytes[..]).unwrap();
+
         let seed = vec![1, 2, 3];
 
         let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
@@ -600,8 +604,25 @@ mod tests {
 		// now verify the proof for nonce = 0
 		assert!(verifier::verify_update::<TinyBLS377>(
 			proof,
-			pk,			
+			pk.clone(),			
 			0,
+		).is_ok());
+
+		let another_murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+            seed.clone(),
+            BLOCK_SCHEDULE.to_vec(),
+            1,
+            same_double_public,
+            &mut rng,
+        ).unwrap();
+
+		let another_proof = another_murmur_store.proof;
+		// let another_pk = another_murmur_store.public_key;
+		// now verify the proof for nonce = 0
+		assert!(verifier::verify_update::<TinyBLS377>(
+			another_proof,
+			pk,			
+			1,
 		).is_ok());
 	}
 

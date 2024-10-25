@@ -137,14 +137,12 @@ pub fn prepare_execute(
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-
+	// use super::*;
 	use super::*;
 	use rand_core::{OsRng, SeedableRng};
 
 	#[test]
 	pub fn it_can_create_an_mmr_store_and_call_data() {
-		let name = b"name".to_vec();
 		let seed = b"seed".to_vec();
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
@@ -162,12 +160,11 @@ mod tests {
 		// ).unwrap();
 
 		assert_eq!(mmr_store.root.0.len(), 32);
-		assert_eq!(mmr_store.size, 7);
+		assert_eq!(mmr_store.metadata.keys().len(), 7);
 	}
 
 	#[test]
 	pub fn it_can_prepare_valid_execution_call_data() {
-		let name = b"name".to_vec();
 		let seed = b"seed".to_vec();
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
@@ -193,14 +190,14 @@ mod tests {
 				},
 			);
 
-        let bob2 = subxt_signer::sr25519::dev::bob().public_key();
-        let balance_transfer_call_2 =
-            etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
-                etf::balances::Call::transfer_allow_death {
-                    dest: subxt::utils::MultiAddress::<_, u32>::from(bob2),
-                    value: 1,
-                },
-            );
+        // let bob2 = subxt_signer::sr25519::dev::bob().public_key();
+        // let balance_transfer_call_2 =
+        //     etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
+        //         etf::balances::Call::transfer_allow_death {
+        //             dest: subxt::utils::MultiAddress::<_, u32>::from(bob2),
+        //             value: 1,
+        //         },
+        //     );
 
 		let when = 1;
 
