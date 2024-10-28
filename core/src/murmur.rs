@@ -370,6 +370,7 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
     use ark_std::rand::SeedableRng;	
 	use ark_serialize::CanonicalDeserialize;	
+	use rand_core::OsRng;
 
 	/// 
 	pub const BLOCK_SCHEDULE: &[BlockNumber] = &[
@@ -580,11 +581,11 @@ mod tests {
             pos,
         ));
     }
-	
+
 	#[test]
 	fn it_can_generate_and_verify_schnorr_proofs() {
 		let mut rng = ChaCha20Rng::seed_from_u64(0);
-        let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut rng);
+		let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
         let double_public: DoublePublicKey<TinyBLS377> = DoublePublicKey(
             keypair.into_public_key_in_signature_group().0,
             keypair.public.0,
@@ -613,20 +614,23 @@ mod tests {
 			0,
 		).unwrap());
 
+		let mut same_rng = ChaCha20Rng::seed_from_u64(0);
 		let another_murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
             seed.clone(),
             BLOCK_SCHEDULE.to_vec(),
             1,
             same_double_public,
-            &mut rng,
+            &mut same_rng,
         ).unwrap();
 
 		let another_proof = another_murmur_store.proof;
 		let another_pk = another_murmur_store.public_key;
+		assert!(pk == another_pk);
+
 		// now verify the proof for nonce = 1
 		assert!(verifier::verify_update::<TinyBLS377>(
 			another_proof,
-			another_pk,			
+			pk,			
 			1,
 		).unwrap());
 	}
@@ -668,6 +672,18 @@ mod tests {
 		let witness2 = generate_witness(seed, rng);
 		
 		assert_eq!(witness1, witness2, "Witnesses should be identical for the same seed");
+
+		let secret_key_1 = 
+		SecretKey::<<<TinyBLS377 as EngineBLS>::SignatureGroup as CurveGroup>::Affine>::from_seed(&witness1);
+		let pubkey_1 = secret_key_1.as_publickey();
+
+
+		let secret_key_2 = 
+			SecretKey::<<<TinyBLS377 as EngineBLS>::SignatureGroup as CurveGroup>::Affine>::from_seed(&witness2);
+		let pubkey_2 = secret_key_2.as_publickey();
+
+		assert!(pubkey_1 == pubkey_2);
+
 	}
 
 }
