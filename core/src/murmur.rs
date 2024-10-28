@@ -243,12 +243,17 @@ impl MurmurStore {
 /// * `rng`: A CSPRNG
 ///
 #[cfg(feature = "client")]
-pub fn generate_witness<R: Rng + CryptoRng + Sized>(mut seed: Vec<u8>, mut rng: R) -> [u8; 32] {
+pub fn generate_witness<R: Rng + CryptoRng + Sized>(
+	mut seed: Vec<u8>, 
+	mut rng: R
+) -> [u8; 32] {
     let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
     transcript.write_bytes(&seed);
     seed.zeroize();
-    let witness: [u8; 32] = transcript.clone().witness(&mut rng).read_byte_array();
-    witness
+
+    transcript.clone()
+		.witness(&mut rng)
+		.read_byte_array()
 }
 
 /// A helper function to perform timelock encryption
@@ -575,7 +580,7 @@ mod tests {
             pos,
         ));
     }
-
+	
 	#[test]
 	fn it_can_generate_and_verify_schnorr_proofs() {
 		let mut rng = ChaCha20Rng::seed_from_u64(0);
@@ -608,21 +613,20 @@ mod tests {
 			0,
 		).unwrap());
 
-		let mut another_rng = ChaCha20Rng::seed_from_u64(1);
 		let another_murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
             seed.clone(),
             BLOCK_SCHEDULE.to_vec(),
             1,
             same_double_public,
-            &mut another_rng,
+            &mut rng,
         ).unwrap();
 
 		let another_proof = another_murmur_store.proof;
-		// let another_pk = another_murmur_store.public_key;
+		let another_pk = another_murmur_store.public_key;
 		// now verify the proof for nonce = 1
 		assert!(verifier::verify_update::<TinyBLS377>(
 			another_proof,
-			pk,			
+			another_pk,			
 			1,
 		).unwrap());
 	}
@@ -658,14 +662,11 @@ mod tests {
 
 	#[test]
 	fn test_generate_witness_determinism() {
-		// Define the same seed input and random number generator state for reproducibility
 		let seed = vec![1, 2, 3, 4, 5, 6, 7, 8];
-		let rng = rand::rngs::StdRng::seed_from_u64(42);
-
+		let rng = ChaCha20Rng::seed_from_u64(0);
 		let witness1 = generate_witness(seed.clone(), rng.clone());
 		let witness2 = generate_witness(seed, rng);
-
-		// Witnesses should match if the function is deterministic
+		
 		assert_eq!(witness1, witness2, "Witnesses should be identical for the same seed");
 	}
 
