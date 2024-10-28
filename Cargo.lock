@@ -2632,7 +2632,10 @@ dependencies = [
 name = "murmur-test-utils"
 version = "0.1.0"
 dependencies = [
+ "ark-ec",
  "ark-serialize",
+ "ark-std",
+ "dleq_vrf 0.0.2 (git+https://github.com/w3f/ring-vrf.git)",
  "murmur-core",
  "rand_core",
  "w3f-bls",
