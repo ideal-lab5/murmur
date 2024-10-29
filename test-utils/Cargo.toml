@@ -33,6 +33,6 @@ std = [
     "ark-std/std",
     "w3f-bls/std",
     "murmur-core/std",
-    "dleq_vrf/std",
+"dleq_vrf/std",
 ]
 no_std = []

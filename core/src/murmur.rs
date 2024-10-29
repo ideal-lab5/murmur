@@ -135,7 +135,7 @@ impl MurmurStore {
 		let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
 
 		for &i in &block_schedule {
-			let otp_code = totp.generate(i as u64);
+			let mut otp_code = totp.generate(i as u64);
 			let identity = I::build_identity(i);
 
 			let mut ephemeral_msk: [u8; 32] = transcript
@@ -156,6 +156,8 @@ impl MurmurStore {
 				ephem_rng,
 			)?;
 			ephemeral_msk.zeroize();
+			otp_code.zeroize();
+
 			let leaf = Leaf(ct_bytes.clone());
 			// Q: How can I test this line?
 			// https://github.com/nervosnetwork/merkle-mountain-range/blob/9e77d3ef81ddfdd9b7dd9583762582e859849dde/src/mmr.rs#L60
@@ -182,9 +184,9 @@ impl MurmurStore {
 		mut rng: R,
 	) -> Result<(MerkleProof<Leaf, MergeLeaves>, Vec<u8>, Ciphertext, u64), Error> {
 		if let Some(ciphertext) = self.metadata.get(&when) {
-
 			let commitment = MurmurStore::commit(seed.clone(), when, &call_data.clone(), &mut rng)?;
 			seed.zeroize();
+
 			let idx = self.metadata.keys().position(|k| k == &when).expect("The leaf should exist");
 			let pos = leaf_index_to_pos(idx as u64);
 			let mmr = self.to_mmr()?;
@@ -210,14 +212,17 @@ impl MurmurStore {
 		let mut witness = generate_witness(seed.clone(), &mut rng);
 		let botp = BOTPGenerator::new(witness.to_vec())
             .map_err(|_| Error::InvalidSeed)?;
+
 		seed.zeroize();
 		witness.zeroize();
 
-		let otp_code = botp.generate(when as u64);
+		let mut otp_code = botp.generate(when as u64);
 
 		let mut hasher = sha3::Sha3_256::default();
 		Digest::update(&mut hasher, otp_code.as_bytes());
 		Digest::update(&mut hasher, data);
+
+		otp_code.zeroize();
 		Ok(hasher.finalize().to_vec())
 	}
 
@@ -326,7 +331,6 @@ pub mod verifier {
 			Digest::update(&mut hasher, otp);
 			Digest::update(&mut hasher, aux_data);
 			let expected_hash = hasher.finalize().to_vec();
-
 			validity = validity && expected_hash == hash;
 		}
 
