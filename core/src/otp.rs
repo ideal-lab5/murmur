@@ -14,11 +14,8 @@
  * limitations under the License.
  */
 
-use alloc::{
-    vec::Vec,
-    string::String,
-};
-use totp_rs::{Secret, TOTP, Algorithm};
+use alloc::{string::String, vec::Vec};
+use totp_rs::{Algorithm, Secret, TOTP};
 use zeroize::Zeroize;
 
 #[derive(Debug)]
@@ -34,32 +31,31 @@ pub struct BOTPGenerator {
 }
 
 impl BOTPGenerator {
-    /// Create a new BOTP generator with the given seed
-    ///
-    /// * `seed`: The seed used to generate OTP codes
-    ///
-    pub fn new(mut seed: Vec<u8>) -> Result<Self, OTPError> {
-        let mut secret = Secret::Raw(seed.clone()).to_bytes()
-            .map_err(|_| OTPError::InvalidSecret)?;
-        seed.zeroize();
-        let totp = TOTP::new(
-            Algorithm::SHA256, // algorithm
-            6,                 // num digits
-            1,                 // skew
-            1,                 // step
-            secret.clone()             // secret
-        ).map_err(|_| OTPError::InvalidSecret)?;
-        secret.zeroize();
-        Ok(BOTPGenerator { totp })
-    }
+	/// Create a new BOTP generator with the given seed
+	///
+	/// * `seed`: The seed used to generate OTP codes
+	pub fn new(mut seed: Vec<u8>) -> Result<Self, OTPError> {
+		let mut secret =
+			Secret::Raw(seed.clone()).to_bytes().map_err(|_| OTPError::InvalidSecret)?;
+		seed.zeroize();
+		let totp = TOTP::new(
+			Algorithm::SHA256, // algorithm
+			6,                 // num digits
+			1,                 // skew
+			1,                 // step
+			secret.clone(),    // secret
+		)
+		.map_err(|_| OTPError::InvalidSecret)?;
+		secret.zeroize();
+		Ok(BOTPGenerator { totp })
+	}
 
-    /// Generate an otp code
-    ///
-    /// * `block_height`: The block for which the code is valid
-    ///
-    pub fn generate(&self, block_height: u64) -> String {
-        self.totp.generate(block_height)
-    }
+	/// Generate an otp code
+	///
+	/// * `block_height`: The block for which the code is valid
+	pub fn generate(&self, block_height: u64) -> String {
+		self.totp.generate(block_height)
+	}
 }
 
 #[cfg(test)]

@@ -57,12 +57,12 @@ pub struct CreateData {
 	pub root: Vec<u8>,
 	/// The size of the MMR
 	pub size: u64,
-    /// The murmur store (map of block nubmer to ciphertext)
+	/// The murmur store (map of block nubmer to ciphertext)
 	pub mmr_store: MurmurStore,
-    /// The serialized VRF public key
-    pub public_key_bytes: Vec<u8>,
-    /// The serialized Schnorr signature
-    pub proof_bytes: Vec<u8>,
+	/// The serialized VRF public key
+	pub public_key_bytes: Vec<u8>,
+	/// The serialized Schnorr signature
+	pub proof_bytes: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -71,11 +71,11 @@ pub struct ProxyData {
 	pub position: u64,
 	/// The hash of the commitment
 	pub hash: Vec<u8>,
-    /// The timelocked ciphertext
+	/// The timelocked ciphertext
 	pub ciphertext: Vec<u8>,
-    /// The Merkle proof items
+	/// The Merkle proof items
 	pub proof_items: Vec<Vec<u8>>,
-    /// The size of the Merkle proof
+	/// The size of the Merkle proof
 	pub size: u64,
 }
 
@@ -149,14 +149,14 @@ mod tests {
 		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
 		let mmr_store =
 			create(seed.clone(), 0, block_schedule.clone(), double_public_bytes.clone(), &mut rng)
-            .unwrap();
+				.unwrap();
 
 		// let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder, ChaCha20Rng>(
 		// 	seed,
 		// 	block_schedule,
 		// 	0,
 		// 	DoublePublicKey::<TinyBLS377>::from_bytes(&double_public_bytes).unwrap(),
-        //     &mut rng,
+		//     &mut rng,
 		// ).unwrap();
 
 		assert_eq!(mmr_store.root.0.len(), 32);
@@ -169,19 +169,14 @@ mod tests {
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
 		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
-		let mmr_store = create(
-            seed.clone(), 
-            0, 
-            block_schedule, 
-            double_public_bytes, 
-            &mut rng
-        ).unwrap();
+		let mmr_store =
+			create(seed.clone(), 0, block_schedule, double_public_bytes, &mut rng).unwrap();
 
 		// let size = proof.mmr_size();
 		// let proof_items: Vec<Vec<u8>> =
 		// 	proof.proof_items().iter().map(|leaf| leaf.0.clone()).collect::<Vec<_>>();
 
-        let bob = subxt_signer::sr25519::dev::bob().public_key();
+		let bob = subxt_signer::sr25519::dev::bob().public_key();
 		let balance_transfer_call =
 			etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
 				etf::balances::Call::transfer_allow_death {
@@ -190,14 +185,14 @@ mod tests {
 				},
 			);
 
-        // let bob2 = subxt_signer::sr25519::dev::bob().public_key();
-        // let balance_transfer_call_2 =
-        //     etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
-        //         etf::balances::Call::transfer_allow_death {
-        //             dest: subxt::utils::MultiAddress::<_, u32>::from(bob2),
-        //             value: 1,
-        //         },
-        //     );
+		// let bob2 = subxt_signer::sr25519::dev::bob().public_key();
+		// let balance_transfer_call_2 =
+		//     etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
+		//         etf::balances::Call::transfer_allow_death {
+		//             dest: subxt::utils::MultiAddress::<_, u32>::from(bob2),
+		//             value: 1,
+		//         },
+		//     );
 
 		let when = 1;
 
@@ -213,9 +208,11 @@ mod tests {
 		// let (proof, commitment, ciphertext, _pos) = create_data.mmr_store
 		// 	.execute(seed.clone(), when, balance_transfer_call_2.encode(), &mut rng)
 		// 	.unwrap();
-        // let expected_commitment = [71, 71, 72, 200, 197, 44, 120, 151, 127, 6, 162, 244, 138, 122, 196, 183, 30, 47, 111, 239, 225, 32, 57, 141, 186, 229, 164, 113, 113, 44, 131, 168];
-        // let expected_ciphertext = [76, 42, 82, 184, 114, 58, 31, 205, 146, 16, 41, 191, 126, 213, 18, 65, 42, 149, 78, 140, 243, 164, 39, 54, 13, 96, 159, 93, 200, 83, 227, 179];
-		// let size = proof.mmr_size();
+		// let expected_commitment = [71, 71, 72, 200, 197, 44, 120, 151, 127, 6, 162, 244, 138,
+		// 122, 196, 183, 30, 47, 111, 239, 225, 32, 57, 141, 186, 229, 164, 113, 113, 44, 131,
+		// 168]; let expected_ciphertext = [76, 42, 82, 184, 114, 58, 31, 205, 146, 16, 41, 191,
+		// 126, 213, 18, 65, 42, 149, 78, 140, 243, 164, 39, 54, 13, 96, 159, 93, 200, 83, 227,
+		// 179]; let size = proof.mmr_size();
 		// let proof_items: Vec<Vec<u8>> =
 		// 	proof.proof_items().iter().map(|leaf| leaf.0.clone()).collect::<Vec<_>>();
 		assert_eq!(proxy_data.position, 0);

@@ -19,12 +19,12 @@
 //! various utilities helpful for testing
 
 use alloc::vec::Vec;
+use ark_ec::CurveGroup;
 use ark_serialize::CanonicalSerialize;
 use ark_std::rand::{CryptoRng, Rng};
-use rand_core::OsRng;
-use ark_ec::CurveGroup;
-use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, EngineBLS, TinyBLS377};
 use dleq_vrf::SecretKey;
+use rand_core::OsRng;
+use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, EngineBLS, TinyBLS377};
 
 extern crate alloc;
 
@@ -35,13 +35,12 @@ pub use murmur_core::murmur::MurmurStore;
 pub use murmur_core::murmur::generate_witness;
 
 pub fn otp<E: EngineBLS, R: Rng + CryptoRng + Sized>(
-	seed: Vec<u8>, 
-	when: u64, 
-	rng: &mut R
+	seed: Vec<u8>,
+	when: u64,
+	rng: &mut R,
 ) -> Vec<u8> {
 	let witness = generate_witness(seed.clone(), rng);
-	let secret_key = 
-		SecretKey::<<E::SignatureGroup as CurveGroup>::Affine>::from_seed(&witness);
+	let secret_key = SecretKey::<<E::SignatureGroup as CurveGroup>::Affine>::from_seed(&witness);
 	let pubkey = secret_key.as_publickey();
 	let mut pubkey_bytes = Vec::new();
 	pubkey.serialize_compressed(&mut pubkey_bytes).unwrap();

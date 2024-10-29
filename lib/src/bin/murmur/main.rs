@@ -15,17 +15,13 @@
  */
 
 use clap::{Parser, Subcommand};
-use murmur_lib::{
-	create, etf, prepare_execute, BlockNumber, BoundedVec, MurmurStore, RuntimeCall,
-};
+use murmur_lib::{create, etf, prepare_execute, BlockNumber, BoundedVec, MurmurStore, RuntimeCall};
 
-use rand_core::{OsRng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+use rand_core::{OsRng, SeedableRng};
 use sp_core::crypto::Ss58Codec;
 use std::{fs::File, time::Instant};
-use subxt::{
-	backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig,
-};
+use subxt::{backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig};
 use subxt_signer::sr25519::dev;
 use thiserror::Error;
 
@@ -94,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let before = Instant::now();
 
 	let (client, current_block_number, round_pubkey_bytes) = idn_connect().await?;
-    let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
+	let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
 
 	match &cli.commands {
 		Commands::New(args) => {
@@ -109,13 +105,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			}
 
 			// 2. create mmr
-			let mmr_store = create(
-                args.seed.as_bytes().to_vec(),
-                0,
-                schedule,
-                round_pubkey_bytes,
-                &mut rng,
-            ).map_err(|_| CLIError::MurmurCreationFailed)?;
+			let mmr_store =
+				create(args.seed.as_bytes().to_vec(), 0, schedule, round_pubkey_bytes, &mut rng)
+					.map_err(|_| CLIError::MurmurCreationFailed)?;
 
 			// 3. add to storage
 			write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
@@ -156,7 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 				current_block_number + 1,
 				store,
 				&balance_transfer_call,
-                &mut rng,
+				&mut rng,
 			)
 			.map_err(|_| CLIError::MurmurExecutionFailed)?;
 
