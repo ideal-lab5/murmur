@@ -220,17 +220,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-curve25519"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ab653b3eff27100f7dcb06b94785f2fbe0d1230408df55d543ee0ef48cd8760"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-std",
-]
-
-[[package]]
 name = "ark-ec"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -295,18 +284,6 @@ dependencies = [
  "ark-ed-on-bls12-381-bandersnatch",
  "ark-ff",
  "ark-models-ext",
- "ark-std",
-]
-
-[[package]]
-name = "ark-ed25519"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c7ed5162ef7c978cfefffcd08cd8393d174836ae1c9fc8fa2dfcd5c2f03a4a9"
-dependencies = [
- "ark-curve25519",
- "ark-ec",
- "ark-ff",
  "ark-std",
 ]
 
@@ -2064,15 +2041,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212ab92002354b4819390025006c897e8140934349e8635c9b077f47b4dcbd20"
 
 [[package]]
-name = "hkdf"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
-dependencies = [
- "hmac 0.12.1",
-]
-
-[[package]]
 name = "hmac"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2581,7 +2549,6 @@ version = "0.1.0"
 dependencies = [
  "ark-bls12-377",
  "ark-ec",
- "ark-ed25519",
  "ark-ff",
  "ark-serialize",
  "ark-std",
@@ -2589,7 +2556,6 @@ dependencies = [
  "ckb-merkle-mountain-range",
  "dleq_vrf 0.0.2 (git+https://github.com/w3f/ring-vrf.git)",
  "etf-crypto-primitives 0.2.4 (git+https://github.com/ideal-lab5/etf-sdk/?branch=dev)",
- "hkdf",
  "parity-scale-codec",
  "rand_chacha",
  "rand_core",

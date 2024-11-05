@@ -51,21 +51,6 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
 }
 
 #[derive(Serialize)]
-/// Data needed to build a valid call for creating a murmur wallet.
-pub struct CreateData {
-	/// The root of the MMR
-	pub root: Vec<u8>,
-	/// The size of the MMR
-	pub size: u64,
-	/// The murmur store (map of block nubmer to ciphertext)
-	pub mmr_store: MurmurStore,
-	/// The serialized VRF public key
-	pub public_key_bytes: Vec<u8>,
-	/// The serialized Schnorr signature
-	pub proof_bytes: Vec<u8>,
-}
-
-#[derive(Serialize)]
 /// Data needed to build a valid call for a proxied execution.
 pub struct ProxyData {
 	pub position: u64,
