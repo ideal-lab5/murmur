@@ -2,7 +2,7 @@
 name = "murmur-core"
 version = "0.1.0"
 edition = "2021"
-description = "Murmur core"
+description = "The core implementation of the Murmur protocol"
 documentation = "https://docs.rs/murmur-core"
 readme = "README.md"
 keywords = ["crypto", "wallet", "keyless"]
@@ -21,7 +21,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 totp-rs = { version = "5.5.1", default-features = false, optional = true }
 codec = { package = "parity-scale-codec", version = "3.6.12", features = ["derive"], default-features = false }
-etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "dev", default-features = false} 
+etf-crypto-primitives = { git = "https://github.com/ideal-lab5/etf-sdk/", branch = "dev", default-features = false } 
 ckb-merkle-mountain-range = { version = "0.5.2", default-features = false }
 sha3 = { version = "0.10.8", default-features = false }
 serde = { version = "1.0.188", features = ["alloc", "derive"], default-features = false}
@@ -34,10 +34,8 @@ rand_chacha = { version = "0.3.1" }
 hkdf = "0.12.4"
 ark-ec = { version = "0.4", default-features = false }
 ark-ff = { version = "0.4", default-features = false }
-# ark-transcript = { git = "https://github.com/w3f/ark-transcript.git", default-features = false}
-ark-ed25519 = { version = "0.4", default-features = false }
-dleq_vrf = { git = "https://github.com/w3f/ring-vrf.git", default-features = false, features = ["getrandom"]}
-ark-transcript = { git = "https://github.com/w3f/ring-vrf.git", default-features = false}
+dleq_vrf = { git = "https://github.com/w3f/ring-vrf.git", default-features = false }
+ark-transcript = { git = "https://github.com/w3f/ring-vrf.git", default-features = false }
 
 [dev-dependencies]
 rand_core = { version = "0.6.4", features = ["getrandom"], default-features = false }
@@ -49,7 +47,6 @@ std = [
     "ark-std/std", 
     "ark-serialize/std",
     "ark-bls12-377/std",
-    "ark-ed25519/std",
     "ark-ec/std",
     "ark-ff/std",
     "ark-transcript/std",
@@ -65,4 +62,5 @@ std = [
 no_std = []
 client = [
     "totp-rs",
+    "dleq_vrf/getrandom"
 ]
