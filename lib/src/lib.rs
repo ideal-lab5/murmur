@@ -24,7 +24,7 @@ pub use etf::runtime_types::{
 	bounded_collections::bounded_vec::BoundedVec, node_template_runtime::RuntimeCall,
 };
 pub use murmur_core::{
-	murmur::{Error, MurmurStore},
+	murmur::{Error, MurmurStore, EngineTinyBLS377},
 	types::BlockNumber,
 };
 use rand_chacha::ChaCha20Rng;
@@ -79,7 +79,7 @@ pub fn create(
 	let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
 		.map_err(|_| Error::InvalidPubkey)?;
 
-	let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder, ChaCha20Rng>(
+	let mmr_store = MurmurStore::<EngineTinyBLS377>::new::<BasicIdBuilder, ChaCha20Rng>(
 		seed.clone(),
 		block_schedule.clone(),
 		nonce,

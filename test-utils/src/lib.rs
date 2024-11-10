@@ -21,32 +21,15 @@
 use alloc::vec::Vec;
 use ark_ec::CurveGroup;
 use ark_serialize::CanonicalSerialize;
-use ark_std::rand::{CryptoRng, Rng};
 use dleq_vrf::SecretKey;
 use rand_core::OsRng;
-use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, EngineBLS, TinyBLS377};
+use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, TinyBLS377};
 
 extern crate alloc;
 
 pub use murmur_core::otp::BOTPGenerator;
 
 pub use murmur_core::murmur::MurmurStore;
-
-pub use murmur_core::murmur::generate_witness;
-
-pub fn otp<E: EngineBLS, R: Rng + CryptoRng + Sized>(
-	seed: Vec<u8>,
-	when: u64,
-	rng: &mut R,
-) -> Vec<u8> {
-	let witness = generate_witness(seed.clone(), rng);
-	let secret_key = SecretKey::<<E::SignatureGroup as CurveGroup>::Affine>::from_seed(&witness);
-	let pubkey = secret_key.as_publickey();
-	let mut pubkey_bytes = Vec::new();
-	pubkey.serialize_compressed(&mut pubkey_bytes).unwrap();
-	let totp = BOTPGenerator::new(witness.to_vec()).unwrap();
-	totp.generate(when).as_bytes().to_vec()
-}
 
 pub fn get_dummy_beacon_pubkey() -> Vec<u8> {
 	let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);

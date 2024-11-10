@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			handle_create(args, client, current_block_number, round_pubkey_bytes, rng).await?
 		},
 		Commands::Update(args) => {
-			// handle_update(args, client, current_block_number, round_pubkey_bytes, rng).await?
+			handle_update(args, client, current_block_number, round_pubkey_bytes, rng).await?
 		},
 		Commands::Execute(args) => handle_execute(args, client, current_block_number, rng).await?,
 	}
@@ -124,15 +124,15 @@ async fn handle_create(
 	client: OnlineClient<SubstrateConfig>,
 	current_block_number: BlockNumber,
 	round_pubkey_bytes: Vec<u8>,
-	mut rng: ChaCha20Rng,
+	rng: ChaCha20Rng,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let mmr_store = build_mmr_store(args, current_block_number, round_pubkey_bytes, rng)?;
 	let call = etf::tx().murmur().create(
 		BoundedVec(args.name.as_bytes().to_vec()),
-		mmr_store.root.0,
+		BoundedVec(mmr_store.root.0),
 		mmr_store.metadata.keys().len() as u64,
-		mmr_store.proof,
-		mmr_store.public_key,
+		BoundedVec(mmr_store.proof),
+		BoundedVec(mmr_store.public_key),
 	);
 
 	client.tx().sign_and_submit_then_watch_default(&call, &dev::alice()).await?;
@@ -142,29 +142,29 @@ async fn handle_create(
 	Ok(())
 }
 
-// /// This function updates an existing Murmur wallet
-// async fn handle_update(
-// 	args: &WalletCreationDetails,
-// 	client: OnlineClient<SubstrateConfig>,
-// 	current_block_number: BlockNumber,
-// 	round_pubkey_bytes: Vec<u8>,
-// 	mut rng: ChaCha20Rng,
-// ) -> Result<(), Box<dyn std::error::Error>> {
-// 	let mmr_store = build_mmr_store(args, current_block_number, round_pubkey_bytes, &mut rng)?;
+/// This function updates an existing Murmur wallet
+async fn handle_update(
+	args: &WalletCreationDetails,
+	client: OnlineClient<SubstrateConfig>,
+	current_block_number: BlockNumber,
+	round_pubkey_bytes: Vec<u8>,
+	rng: ChaCha20Rng,
+) -> Result<(), Box<dyn std::error::Error>> {
+	let mmr_store = build_mmr_store(args, current_block_number, round_pubkey_bytes, rng)?;
 
-// 	let call = etf::tx().murmur().update(
-// 		BoundedVec(args.name.as_bytes().to_vec()),
-// 		mmr_store.root.0,
-// 		mmr_store.metadata.keys().len() as u64,
-// 		mmr_store.proof,
-// 	);
+	let call = etf::tx().murmur().update(
+		BoundedVec(args.name.as_bytes().to_vec()),
+		BoundedVec(mmr_store.root.0),
+		mmr_store.metadata.keys().len() as u64,
+		BoundedVec(mmr_store.proof),
+	);
 
-// 	client.tx().sign_and_submit_then_watch_default(&call, &dev::alice()).await?;
+	client.tx().sign_and_submit_then_watch_default(&call, &dev::alice()).await?;
 
-// 	println!("✅ Murmur Proxy Update: Successful!");
+	println!("✅ Murmur Proxy Update: Successful!");
 
-// 	Ok(())
-// }
+	Ok(())
+}
 
 /// Build a new Murmur store for each block from `current_block_number + 2` to `current_block_number + args.validity`
 fn build_mmr_store(

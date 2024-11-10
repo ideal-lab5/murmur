@@ -26,7 +26,7 @@ use ark_std::rand::{CryptoRng, Rng, SeedableRng};
 use zeroize::Zeroize;
 
 #[cfg(feature = "client")]
-use ark_serialize::CanonicalSerialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use crate::types::*;
 use ark_ec::CurveGroup;
@@ -37,6 +37,7 @@ use ckb_merkle_mountain_range::{
 	MerkleProof,
 };
 use codec::{Decode, Encode};
+use core::marker::PhantomData;
 use dleq_vrf::{EcVrfVerifier, PublicKey, SecretKey};
 use etf_crypto_primitives::{encryption::tlock::*, ibe::fullident::Identity};
 use sha3::Digest;
@@ -44,6 +45,8 @@ use w3f_bls::{DoublePublicKey, EngineBLS};
 
 /// The Murmur protocol label for domain separation in transcripts
 pub const MURMUR_PROTO: &[u8] = b"Murmur://";
+pub const MURMUR_PROTO_OTP: &[u8] = b"MurmurOTP://";
+pub const MURMUR_PROTO_VRF: &[u8] = b"MurmurVRF://";
 /// The size of a 32-bit buffer
 pub const ALLOCATED_BUFFER_BYTES: usize = 32;
 
@@ -61,6 +64,8 @@ pub enum Error {
 	NoCiphertextFound,
 	/// There was an error when executing timelock encryption (is the ciphertext too large?)
 	TlockFailed,
+	/// There was an error when executing AES GCM decryption
+	AesDecryptFailed,
 	/// The buffer does not have enough space allocated
 	InvalidBufferSize,
 	/// The seed was invalid
@@ -69,10 +74,32 @@ pub enum Error {
 	InvalidPubkey,
 }
 
+pub trait ProtocolEngine {
+	type Engine: EngineBLS;
+	fn protocol_id() -> ProtocolId;
+}
+
+/// The supported protocols
+#[cfg(feature = "client")]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Encode, Decode)]
+pub enum ProtocolId {
+	/// small signatures, SignatureGroup = G1 (48 bytes), PublicKeyGroup = G2 (96 bytes)
+	TinyBLS377,
+}
+
+/// Use the TinyBLS377 engine
+pub struct EngineTinyBLS377;
+impl ProtocolEngine for EngineTinyBLS377 {
+	type Engine = w3f_bls::TinyBLS377;
+	fn protocol_id() -> ProtocolId {
+		ProtocolId::TinyBLS377
+	}
+}
+
 /// The murmur store contains minimal data required to use a murmur wallet
 #[cfg(feature = "client")]
 #[derive(Clone, serde::Serialize, serde::Deserialize, Encode, Decode)]
-pub struct MurmurStore {
+pub struct MurmurStore<P: ProtocolEngine> {
 	/// The nonce of this murmur store
 	pub nonce: u64,
 	/// A map of block numbers to leaf positions in the mmr
@@ -83,66 +110,87 @@ pub struct MurmurStore {
 	pub proof: Vec<u8>,
 	/// A serialized public key associated with the VRF proof
 	pub public_key: Vec<u8>,
+	/// The id of the protocol used to generate the murmur store
+	pub protocol_id: ProtocolId,
+	/// The protocol engine used
+	_phantom: PhantomData<P>,
 }
 
 #[cfg(feature = "client")]
-impl MurmurStore {
+impl<P: ProtocolEngine> MurmurStore<P> {
 	/// Create a new Murmur store
 	///
 	/// * `seed`: An any-length seed (i.e. password)
 	/// * `block_schedule`: The blocks for which OTP codes will be generated
 	/// * `ephemeral_msk`: Any 32 bytes
 	/// * `round_public_key`: The IDN beacon's public key
-	pub fn new<E: EngineBLS, I: IdentityBuilder<BlockNumber>, R>(
+	pub fn new<I: IdentityBuilder<BlockNumber>, R>(
 		mut seed: Vec<u8>,
 		block_schedule: Vec<BlockNumber>,
 		nonce: u64,
-		round_public_key: DoublePublicKey<E>,
+		round_public_key: DoublePublicKey<P::Engine>,
 		rng: &mut R,
 	) -> Result<Self, Error>
 	where
 		R: Rng + CryptoRng + SeedableRng<Seed = [u8; 32]> + Sized,
 	{
-		let mut witness = generate_witness(seed.clone(), rng);
-		let mut secret_key =
-			SecretKey::<<E::SignatureGroup as CurveGroup>::Affine>::from_seed(&witness);
+		let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
+		transcript.write_bytes(&seed);
+
+		let mut challenge: [u8; 32] = transcript.challenge(b"challenge").read_byte_array();
+
+		let mut secret_key = SecretKey::<
+			<<P::Engine as EngineBLS>::SignatureGroup as CurveGroup>::Affine,
+		>::from_seed(&challenge);
+
 		let pubkey = secret_key.as_publickey();
 		let mut pubkey_bytes = Vec::new();
 		pubkey.serialize_compressed(&mut pubkey_bytes).unwrap();
 
-		// generate a transcript s.t. the proof verification requires the nonce
-		let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
-		transcript.write_bytes(&nonce.to_be_bytes());
-		let signature = secret_key.sign_thin_vrf_detached(transcript.clone(), &[]);
+		let mut vrf_transcript = Transcript::new_labeled(MURMUR_PROTO_VRF);
+		// generate a transcript such that the proof verification requires the nonce
+		vrf_transcript.write_bytes(&nonce.to_be_bytes());
+		let signature = secret_key.sign_thin_vrf_detached(vrf_transcript.clone(), &[]);
 
 		let mut sig_bytes = Vec::new();
 		signature.serialize_compressed(&mut sig_bytes).unwrap();
 
+		let mut witness: [u8; 32] = transcript.clone().witness(rng).read_byte_array();
 		let totp = BOTPGenerator::new(witness.to_vec()).map_err(|_| Error::InvalidSeed)?;
 
-		seed.zeroize();
 		witness.zeroize();
+		challenge.zeroize();
 		secret_key.zeroize();
 
 		let mut metadata = BTreeMap::new();
 		let store = MemStore::default();
 		let mut mmr = MemMMR::<_, MergeLeaves>::new(0, store);
 
+		let mut transcript_otp = Transcript::new_labeled(MURMUR_PROTO_OTP);
+		transcript_otp.write_bytes(&seed);
+		transcript_otp.write_bytes(&nonce.to_be_bytes());
+
+		seed.zeroize();
+
+		// let t: [u8;32] = transcript_otp.challenge(b"ok").read_byte_array();
+		// panic!("{:?}", t);
 		for &i in &block_schedule {
 			let mut otp_code = totp.generate(i as u64);
 			let identity = I::build_identity(i);
-
-			let mut ephemeral_msk: [u8; 32] = transcript
+			let mut ephemeral_msk: [u8; 32] = transcript_otp
 				.clone()
 				.fork(b"otp-leaf-gen")
 				.chain(&i.to_be_bytes())
-				.chain(&otp_code.as_bytes())
 				.challenge(b"ephemeral_msk")
 				.read_byte_array();
 
+			// if i == 10 {
+			// 	panic!("{:?}", ephemeral_msk);
+			// }
+
 			let ephem_rng = R::from_seed(ephemeral_msk);
 
-			let ct_bytes = timelock_encrypt::<E, R>(
+			let ct_bytes = timelock_encrypt::<P::Engine, R>(
 				identity,
 				round_public_key.1,
 				ephemeral_msk,
@@ -161,7 +209,15 @@ impl MurmurStore {
 
 		let root = mmr.get_root().map_err(|_| Error::InconsistentStore)?;
 
-		Ok(MurmurStore { nonce, metadata, root, proof: sig_bytes, public_key: pubkey_bytes })
+		Ok(MurmurStore {
+			nonce,
+			metadata,
+			root,
+			proof: sig_bytes,
+			public_key: pubkey_bytes,
+			protocol_id: P::protocol_id(),
+			_phantom: PhantomData,
+		})
 	}
 
 	/// Build data required (proof and commitment) to execute a valid call from a murmur wallet
@@ -169,18 +225,24 @@ impl MurmurStore {
 	/// * `seed`: The seed used to create the mmr
 	/// * `when`: The block number when the wallet is being used (or will be)
 	/// * `call_data`: The call to be executed with the wallet (at `when`)
-	pub fn execute<R: Rng + CryptoRng + Sized>(
+	pub fn execute(
 		&self,
 		mut seed: Vec<u8>,
 		when: BlockNumber,
 		call_data: Vec<u8>,
-		mut rng: R,
 	) -> Result<(MerkleProof<Leaf, MergeLeaves>, Vec<u8>, Ciphertext, u64), Error> {
 		if let Some(ciphertext) = self.metadata.get(&when) {
-			let commitment = MurmurStore::commit(seed.clone(), when, &call_data.clone(), &mut rng)?;
+
+			let commitment = self.commit(
+				seed.clone(),
+				ciphertext.clone(),
+				&call_data.clone(),
+				when,
+			)?;
+
 			seed.zeroize();
 
-			let idx = self.metadata.keys().position(|k| k == &when).expect("The leaf should exist");
+			let idx = self.metadata.keys().position(|k| k == &when).expect("The leaf exists");
 			let pos = leaf_index_to_pos(idx as u64);
 			let mmr = self.to_mmr()?;
 			let proof = mmr.gen_proof(vec![pos]).map_err(|_| Error::InconsistentStore)?;
@@ -195,22 +257,30 @@ impl MurmurStore {
 	/// * `seed`: The seed used to generated the MMR
 	/// * `when`: The block number when the commitment is verifiable
 	/// * `data`: The data to commit to
-	fn commit<R: Rng + CryptoRng + Sized>(
+	fn commit(
+		&self,
 		mut seed: Vec<u8>,
-		when: BlockNumber,
+		ciphertext: Vec<u8>,
 		data: &[u8],
-		mut rng: R,
+		when: BlockNumber,
 	) -> Result<Vec<u8>, Error> {
-		let mut witness = generate_witness(seed.clone(), &mut rng);
-		let botp = BOTPGenerator::new(witness.to_vec()).map_err(|_| Error::InvalidSeed)?;
+		let mut transcript = Transcript::new_labeled(MURMUR_PROTO_OTP);
+		transcript.write_bytes(&seed);
+		transcript.write_bytes(&self.nonce.to_be_bytes());
+
+		let mut ephemeral_msk: [u8; 32] = transcript
+			.clone()
+			.fork(b"otp-leaf-gen")
+			.chain(&when.to_be_bytes())
+			.challenge(b"ephemeral_msk")
+			.read_byte_array();
 
 		seed.zeroize();
-		witness.zeroize();
-
-		let mut otp_code = botp.generate(when as u64);
+		let mut otp_code = aes_decrypt::<P::Engine>(ciphertext, ephemeral_msk.as_slice().to_vec())?;
+		ephemeral_msk.zeroize();
 
 		let mut hasher = sha3::Sha3_256::default();
-		Digest::update(&mut hasher, otp_code.as_bytes());
+		Digest::update(&mut hasher, &otp_code);
 		Digest::update(&mut hasher, data);
 
 		otp_code.zeroize();
@@ -231,20 +301,6 @@ impl MurmurStore {
 	}
 }
 
-/// construct a 32-byte witness by seeding a transcript with the given 'seed'
-/// using a CSPRNG to generate the witness
-///
-/// * `seed`: The value written to the transcript
-/// * `rng`: A CSPRNG
-#[cfg(feature = "client")]
-pub fn generate_witness<R: Rng + CryptoRng + Sized>(mut seed: Vec<u8>, mut rng: R) -> [u8; 32] {
-	let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
-	transcript.write_bytes(&seed);
-	seed.zeroize();
-
-	transcript.clone().witness(&mut rng).read_byte_array()
-}
-
 /// A helper function to perform timelock encryption
 ///
 /// * `identity`: The identity to encrypt for
@@ -262,11 +318,29 @@ fn timelock_encrypt<E: EngineBLS, R: CryptoRng + Rng + Sized>(
 ) -> Result<Vec<u8>, Error> {
 	let ciphertext =
 		tle::<E, R>(pk, ephemeral_msk, message, identity, rng).map_err(|_| Error::TlockFailed)?;
+
 	let mut ct_bytes = Vec::new();
 	ciphertext
 		.serialize_compressed(&mut ct_bytes)
 		.map_err(|_| Error::InvalidBufferSize)?;
+
 	Ok(ct_bytes)
+}
+
+/// Use a secret key to decrypt the ciphertext before the beacon outputs
+/// This uses AES_GCM decryption. It returns the plaintext if decryption is successful, else an error
+///
+/// * `ciphertext_bytes`: The ciphertext to decrypt
+/// * `secret`: A decryption key (32 bytes)
+///
+#[cfg(feature = "client")]
+fn aes_decrypt<E: EngineBLS>(ciphertext_bytes: Vec<u8>, secret: Vec<u8>) -> Result<Vec<u8>, Error> {
+	let ciphertext: TLECiphertext<E> =
+		TLECiphertext::deserialize_compressed(&mut &ciphertext_bytes[..]).unwrap();
+
+	let plaintext = ciphertext.aes_decrypt(secret).map_err(|_| Error::AesDecryptFailed)?;
+
+	Ok(plaintext.message)
 }
 
 /// Functions for verifying execution and update requests
@@ -278,14 +352,17 @@ pub mod verifier {
 
 	#[derive(Debug, PartialEq)]
 	pub enum VerificationError {
+		/// The Schnorr proof could not be deserialized
 		UnserializableProof,
+		/// The public key could not be deserialized
 		UnserializablePubkey,
 	}
 
-	/// Verify the correctness of execution parameters by checking that the Merkle proof and hash
-	/// are valid The function outputs true if both conditions are true:
-	///		proof.verify(root, [(pos, Leaf(ciphertext))])
-	///		hash = Sha256(otp || aux_data)
+	/// Verify the correctness of execution parameters by checking that the Merkle proof, `Proof`, and hash `H`
+	/// are valid. The function outputs true if both conditions are true:
+	///
+	///	1. Proof.Verify(root, [(pos, Leaf(ciphertext))])
+	///	2. H == Sha256(otp || aux_data)
 	////
 	/// It outputs false otherwise.
 	///
@@ -296,6 +373,7 @@ pub mod verifier {
 	/// * `otp`: The OTP
 	/// * `aux_data`: The expected aux data used to generate the commitment
 	/// * `pos`: The position of the Ciphertext within the MMR
+	///
 	pub fn verify_execute(
 		root: Leaf,
 		proof: MerkleProof<Leaf, MergeLeaves>,
@@ -310,6 +388,7 @@ pub mod verifier {
 		if validity {
 			let mut hasher = sha3::Sha3_256::default();
 			Digest::update(&mut hasher, otp);
+
 			Digest::update(&mut hasher, aux_data);
 			let expected_hash = hasher.finalize().to_vec();
 			validity = validity && expected_hash == hash;
@@ -320,18 +399,19 @@ pub mod verifier {
 
 	/// Verifies a Schnorr proof
 	/// This is used to ensure that subsequent calls to the 'new' function are called with the same
-	/// seed
+	/// seed where the output is non-deterministic
 	///
 	/// * `serialized_proof`: The serialized proof
 	/// * `serialized_pubkey`: The serialized public key
 	/// * `nonce`: A nonce value
+	///
 	pub fn verify_update<E: EngineBLS>(
 		serialized_proof: Vec<u8>,
 		serialized_pubkey: Vec<u8>,
 		nonce: u64,
 	) -> Result<bool, VerificationError> {
 		// build transcript
-		let mut transcript = Transcript::new_labeled(MURMUR_PROTO);
+		let mut transcript = Transcript::new_labeled(MURMUR_PROTO_VRF);
 		transcript.write_bytes(&nonce.to_be_bytes());
 
 		// deserialize proof and pubkey
@@ -360,12 +440,11 @@ mod tests {
 	use rand_core::OsRng;
 	use w3f_bls::{DoublePublicKeyScheme, TinyBLS377};
 
-	///
 	pub const BLOCK_SCHEDULE: &[BlockNumber] =
 		&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
 	pub const WHEN: BlockNumber = 10;
-	pub const OTP: &[u8] = b"823185";
+	pub const OTP: &[u8] = &[52, 54, 49, 53, 51, 54];
 
 	pub struct DummyIdBuilder;
 	impl IdentityBuilder<BlockNumber> for DummyIdBuilder {
@@ -384,7 +463,7 @@ mod tests {
 
 		let seed = vec![1, 2, 3];
 
-		let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+		let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
 			seed.clone(),
 			BLOCK_SCHEDULE.to_vec(),
 			0,
@@ -410,7 +489,7 @@ mod tests {
 		let seed = vec![1, 2, 3];
 		let aux_data = vec![2, 3, 4, 5];
 
-		let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+		let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
 			seed.clone(),
 			BLOCK_SCHEDULE.to_vec(),
 			0,
@@ -421,10 +500,10 @@ mod tests {
 
 		let root = murmur_store.root.clone();
 		let (proof, commitment, ciphertext, pos) =
-			murmur_store.execute(seed.clone(), WHEN, aux_data.clone(), &mut rng).unwrap();
+			murmur_store.execute(seed.clone(), WHEN, aux_data.clone()).unwrap();
 
 		assert!(
-			verifier::verify_execute(root, proof, commitment, ciphertext, OTP, &aux_data, pos,)
+			verifier::verify_execute(root, proof, commitment, ciphertext, OTP, &aux_data, pos)
 		);
 	}
 
@@ -438,7 +517,7 @@ mod tests {
 
 		let seed = vec![1, 2, 3];
 
-		let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+		let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
 			seed.clone(),
 			BLOCK_SCHEDULE.to_vec(),
 			0,
@@ -449,7 +528,7 @@ mod tests {
 
 		let aux_data = vec![2, 3, 4, 5];
 
-		match murmur_store.execute(seed.clone(), 10000, aux_data.clone(), &mut rng) {
+		match murmur_store.execute(seed.clone(), 10000, aux_data.clone()) {
 			Ok(_) => panic!("There should be an error"),
 			Err(e) => assert_eq!(e, Error::NoCiphertextFound),
 		}
@@ -466,7 +545,7 @@ mod tests {
 		let seed = vec![1, 2, 3];
 		let aux_data = vec![2, 3, 4, 5];
 
-		let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+		let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
 			seed.clone(),
 			BLOCK_SCHEDULE.to_vec(),
 			0,
@@ -477,7 +556,7 @@ mod tests {
 
 		let root = murmur_store.root.clone();
 		let (proof, commitment, ciphertext, pos) =
-			murmur_store.execute(seed.clone(), WHEN, aux_data.clone(), &mut rng).unwrap();
+			murmur_store.execute(seed.clone(), 1, aux_data.clone()).unwrap();
 
 		let bad_aux = vec![2, 3, 13, 3];
 		assert!(
@@ -501,7 +580,7 @@ mod tests {
 		let seed = vec![1, 2, 3];
 		let other_seed = vec![2, 3, 4];
 
-		let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+		let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
 			seed.clone(),
 			BLOCK_SCHEDULE.to_vec(),
 			0,
@@ -510,21 +589,22 @@ mod tests {
 		)
 		.unwrap();
 
-		let other_murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
-			other_seed.clone(),
-			BLOCK_SCHEDULE.to_vec(),
-			0,
-			other_double_public,
-			&mut rng,
-		)
-		.unwrap();
+		let other_murmur_store =
+			MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
+				other_seed.clone(),
+				BLOCK_SCHEDULE.to_vec(),
+				0,
+				other_double_public,
+				&mut rng,
+			)
+			.unwrap();
 
 		let aux_data = vec![2, 3, 13, 3];
 
 		// the block number when this would execute
 		let root = murmur_store.root.clone();
 		let (proof, commitment, ciphertext, pos) = other_murmur_store
-			.execute(other_seed.clone(), WHEN, aux_data.clone(), &mut rng)
+			.execute(other_seed.clone(), WHEN, aux_data.clone())
 			.unwrap();
 
 		assert!(!verifier::verify_execute(
@@ -546,7 +626,7 @@ mod tests {
 
 		let seed = vec![1, 2, 3];
 
-		let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+		let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
 			seed.clone(),
 			BLOCK_SCHEDULE.to_vec(),
 			0,
@@ -560,15 +640,16 @@ mod tests {
 		// now verify the proof for nonce = 0
 		assert!(verifier::verify_update::<TinyBLS377>(proof, pk.clone(), 0,).unwrap());
 
-		let mut same_rng = ChaCha20Rng::seed_from_u64(0);
-		let another_murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
-			seed.clone(),
-			BLOCK_SCHEDULE.to_vec(),
-			1,
-			same_double_public,
-			&mut same_rng,
-		)
-		.unwrap();
+		let mut not_same_rng = ChaCha20Rng::seed_from_u64(1);
+		let another_murmur_store =
+			MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
+				seed.clone(),
+				BLOCK_SCHEDULE.to_vec(),
+				1,
+				same_double_public,
+				&mut not_same_rng,
+			)
+			.unwrap();
 
 		let another_proof = another_murmur_store.proof;
 		let another_pk = another_murmur_store.public_key;
@@ -587,7 +668,7 @@ mod tests {
 
 		let seed = vec![1, 2, 3];
 
-		let murmur_store = MurmurStore::new::<TinyBLS377, DummyIdBuilder, ChaCha20Rng>(
+		let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<DummyIdBuilder, ChaCha20Rng>(
 			seed.clone(),
 			BLOCK_SCHEDULE.to_vec(),
 			0,
@@ -600,27 +681,5 @@ mod tests {
 		let pk = murmur_store.public_key;
 		// now verify the proof for nonce = 1
 		assert!(!verifier::verify_update::<TinyBLS377>(proof, pk, 1,).unwrap());
-	}
-
-	#[test]
-	fn test_generate_witness_determinism() {
-		let seed = vec![1, 2, 3, 4, 5, 6, 7, 8];
-		let rng = ChaCha20Rng::seed_from_u64(0);
-		let witness1 = generate_witness(seed.clone(), rng.clone());
-		let witness2 = generate_witness(seed, rng);
-
-		assert_eq!(witness1, witness2, "Witnesses should be identical for the same seed");
-
-		let secret_key_1 = SecretKey::<
-			<<TinyBLS377 as EngineBLS>::SignatureGroup as CurveGroup>::Affine,
-		>::from_seed(&witness1);
-		let pubkey_1 = secret_key_1.as_publickey();
-
-		let secret_key_2 = SecretKey::<
-			<<TinyBLS377 as EngineBLS>::SignatureGroup as CurveGroup>::Affine,
-		>::from_seed(&witness2);
-		let pubkey_2 = secret_key_2.as_publickey();
-
-		assert!(pubkey_1 == pubkey_2);
 	}
 }
