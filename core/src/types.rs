@@ -19,7 +19,7 @@ use ckb_merkle_mountain_range::{Merge, Result as MMRResult};
 use codec::{Decode, Encode};
 use sha3::Digest;
 
-pub use etf_crypto_primitives::ibe::fullident::Identity;
+pub use tle::ibe::fullident::Identity;
 
 /// The type to represent a block number
 pub type BlockNumber = u32;

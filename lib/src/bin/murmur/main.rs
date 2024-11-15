@@ -15,10 +15,11 @@
  */
 
 use clap::{Parser, Subcommand};
-use murmur_lib::{create, etf, prepare_execute, BlockNumber, BoundedVec, MurmurStore, RuntimeCall};
+use murmur_lib::{
+	create, etf, prepare_execute, BlockNumber, BoundedVec, EngineTinyBLS377, MurmurStore,
+	RuntimeCall,
+};
 
-use rand_chacha::ChaCha20Rng;
-use rand_core::{OsRng, SeedableRng};
 use sp_core::crypto::Ss58Codec;
 use std::{fs::File, time::Instant};
 use subxt::{backend::rpc::RpcClient, client::OnlineClient, config::SubstrateConfig};
@@ -102,16 +103,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let before = Instant::now();
 
 	let (client, current_block_number, round_pubkey_bytes) = idn_connect().await?;
-	let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
 
 	match &cli.commands {
-		Commands::New(args) => {
-			handle_create(args, client, current_block_number, round_pubkey_bytes, rng).await?
-		},
-		Commands::Update(args) => {
-			handle_update(args, client, current_block_number, round_pubkey_bytes, rng).await?
-		},
-		Commands::Execute(args) => handle_execute(args, client, current_block_number, rng).await?,
+		Commands::New(args) =>
+			handle_create(args, client, current_block_number, round_pubkey_bytes).await?,
+		Commands::Update(args) =>
+			handle_update(args, client, current_block_number, round_pubkey_bytes).await?,
+		Commands::Execute(args) => handle_execute(args, client, current_block_number).await?,
 	}
 
 	println!("Elapsed time: {:.2?}", before.elapsed());
@@ -124,9 +122,19 @@ async fn handle_create(
 	client: OnlineClient<SubstrateConfig>,
 	current_block_number: BlockNumber,
 	round_pubkey_bytes: Vec<u8>,
-	rng: ChaCha20Rng,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	let mmr_store = build_mmr_store(args, current_block_number, round_pubkey_bytes, rng)?;
+	let mmr_store = build_mmr_store(args, current_block_number, round_pubkey_bytes, 0)?;
+
+	// sanity check
+	let b: bool = murmur_core::murmur::verifier::verify_update::<w3f_bls::TinyBLS377>(
+		mmr_store.proof.clone(),
+		mmr_store.public_key.clone(),
+		0,
+	).unwrap();
+	assert!(b == true);
+
+	println!("the proof looks good! ok ... proof bytes {:?}, public kye  bytes {:?}", mmr_store.proof.clone(), mmr_store.public_key.clone());
+
 	let call = etf::tx().murmur().create(
 		BoundedVec(args.name.as_bytes().to_vec()),
 		BoundedVec(mmr_store.root.0),
@@ -138,7 +146,6 @@ async fn handle_create(
 	client.tx().sign_and_submit_then_watch_default(&call, &dev::alice()).await?;
 
 	println!("✅ Murmur Proxy Creation: Successful!");
-
 	Ok(())
 }
 
@@ -148,9 +155,13 @@ async fn handle_update(
 	client: OnlineClient<SubstrateConfig>,
 	current_block_number: BlockNumber,
 	round_pubkey_bytes: Vec<u8>,
-	rng: ChaCha20Rng,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	let mmr_store = build_mmr_store(args, current_block_number, round_pubkey_bytes, rng)?;
+	// existing mmr_store, we only need this to get the nonce
+	// note that there are many other ways to get this as well (e.g. query the runtime)
+	let store: MurmurStore<EngineTinyBLS377> = load_mmr_store(MMR_STORE_FILEPATH)?;
+
+	let mmr_store =
+		build_mmr_store(args, current_block_number, round_pubkey_bytes, store.nonce + 1)?;
 
 	let call = etf::tx().murmur().update(
 		BoundedVec(args.name.as_bytes().to_vec()),
@@ -166,41 +177,38 @@ async fn handle_update(
 	Ok(())
 }
 
-/// Build a new Murmur store for each block from `current_block_number + 2` to `current_block_number + args.validity`
+/// Build a new Murmur store for each block from `current_block_number + 2` to `current_block_number
+/// + args.validity`
 fn build_mmr_store(
 	args: &WalletCreationDetails,
 	current_block_number: BlockNumber,
 	round_pubkey_bytes: Vec<u8>,
-	mut rng: ChaCha20Rng,
-) -> Result<MurmurStore, Box<dyn std::error::Error>> {
+	nonce: u64,
+) -> Result<MurmurStore<EngineTinyBLS377>, Box<dyn std::error::Error>> {
 	println!("🏗️ Murmur: Generating Merkle mountain range");
-	// 1. prepare block schedule
 	let mut schedule: Vec<BlockNumber> = Vec::new();
 	for i in 2..args.validity + 2 {
-		// wallet is 'active' in 2 blocks
+		// the wallet is 'active' 2 blocks from the current block
 		let next_block_number: BlockNumber = current_block_number + i;
 		schedule.push(next_block_number);
 	}
 
-	// 2. create mmr
-	let mmr_store =
-		create(args.seed.as_bytes().to_vec(), 0, schedule, round_pubkey_bytes, &mut rng)
+	let mmr_store: MurmurStore<EngineTinyBLS377> =
+		create(args.seed.as_bytes().to_vec(), nonce, schedule, round_pubkey_bytes)
 			.map_err(|_| CLIError::MurmurCreationFailed)?;
 
-	// 3. add to storage
-	write_mmr_store(mmr_store.clone(), MMR_STORE_FILEPATH);
+	write_mmr_store(mmr_store.encode(), MMR_STORE_FILEPATH);
 
 	Ok(mmr_store)
 }
 
-/// This function executes a call from the Murmur proxy at block after the provided `current_block_height`
-/// note that this does not guarantee execution. If the transaction is not included in a block in the upcoming block
-/// then it will never be executed
+/// This function executes a call from the Murmur proxy at block after the provided
+/// `current_block_height` note that this does not guarantee execution. If the transaction is not
+/// included in a block in the upcoming block then it will never be executed
 async fn handle_execute(
 	args: &WalletExecuteDetails,
 	client: OnlineClient<SubstrateConfig>,
 	current_block_number: BlockNumber,
-	mut rng: ChaCha20Rng,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	// 1. build proxied call
 	let from_ss58 = sp_core::crypto::AccountId32::from_ss58check(&args.to)
@@ -214,7 +222,7 @@ async fn handle_execute(
 	});
 
 	// 2. load the MMR store
-	let store: MurmurStore = load_mmr_store(MMR_STORE_FILEPATH)?;
+	let store: MurmurStore<EngineTinyBLS377> = load_mmr_store(MMR_STORE_FILEPATH)?;
 	println!("💾 Recovered Murmur store from local file");
 
 	// 3. get the proxy data
@@ -223,7 +231,6 @@ async fn handle_execute(
 		current_block_number + 1,
 		store,
 		&balance_transfer_call,
-		&mut rng,
 	)
 	.map_err(|_| CLIError::MurmurExecutionFailed)?;
 
@@ -272,15 +279,17 @@ async fn idn_connect(
 }
 
 /// read an MMR from a file
-fn load_mmr_store(path: &str) -> Result<MurmurStore, CLIError> {
+fn load_mmr_store(path: &str) -> Result<MurmurStore<EngineTinyBLS377>, CLIError> {
 	let mmr_store_file = File::open(path).expect("Unable to open file");
-	let data: MurmurStore =
+	let data: Vec<u8> =
 		serde_cbor::from_reader(mmr_store_file).map_err(|_| CLIError::CorruptedMurmurStore)?;
-	Ok(data)
+	// TODO: create new error type
+	let mmr_store = MurmurStore::<EngineTinyBLS377>::decode(data).unwrap();
+	Ok(mmr_store)
 }
 
 /// Write the MMR data to a file
-fn write_mmr_store(mmr_store: MurmurStore, path: &str) {
+fn write_mmr_store(mmr_store_data: Vec<u8>, path: &str) {
 	let mmr_store_file = File::create(path).expect("It should create the file");
-	serde_cbor::to_writer(mmr_store_file, &mmr_store).unwrap();
+	serde_cbor::to_writer(mmr_store_file, &mmr_store_data).unwrap();
 }

@@ -1542,33 +1542,6 @@ dependencies = [
 [[package]]
 name = "etf-crypto-primitives"
 version = "0.2.4"
-source = "git+https://github.com/ideal-lab5/etf-sdk/?branch=dev#e2b3615e0936c2cdd1ab8673e15208bef880b040"
-dependencies = [
- "aes-gcm",
- "ark-bls12-377",
- "ark-bls12-381",
- "ark-ec",
- "ark-ff",
- "ark-poly",
- "ark-serialize",
- "ark-std",
- "array-bytes",
- "chacha20poly1305",
- "generic-array",
- "parity-scale-codec",
- "rand_chacha",
- "scale-info",
- "serde",
- "serde_cbor",
- "serde_json",
- "sha2 0.10.8",
- "sha3",
- "w3f-bls",
-]
-
-[[package]]
-name = "etf-crypto-primitives"
-version = "0.2.4"
 source = "git+https://github.com/ideal-lab5/etf-sdk/?branch=tony/dev#159ed603ca8a31b7d2e5f4437c62411c4d1fd743"
 dependencies = [
  "aes-gcm",
@@ -2555,12 +2528,12 @@ dependencies = [
  "ark-transcript 0.0.2 (git+https://github.com/w3f/ring-vrf.git)",
  "ckb-merkle-mountain-range",
  "dleq_vrf 0.0.2 (git+https://github.com/w3f/ring-vrf.git)",
- "etf-crypto-primitives 0.2.4 (git+https://github.com/ideal-lab5/etf-sdk/?branch=dev)",
  "parity-scale-codec",
  "rand_chacha",
  "rand_core",
  "serde",
  "sha3",
+ "tle",
  "totp-rs",
  "w3f-bls",
  "zeroize",
@@ -4922,6 +4895,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "tle"
+version = "0.1.0"
+source = "git+https://github.com/ideal-lab5/tle.git?branch=feat/tle-monorepo#1a50d569cdda608df56d4951b7141e43cc067cef"
+dependencies = [
+ "aes-gcm",
+ "ark-bls12-377",
+ "ark-bls12-381",
+ "ark-ec",
+ "ark-ff",
+ "ark-poly",
+ "ark-serialize",
+ "ark-std",
+ "array-bytes",
+ "chacha20poly1305",
+ "generic-array",
+ "parity-scale-codec",
+ "rand_chacha",
+ "rand_core",
+ "scale-info",
+ "serde",
+ "serde_cbor",
+ "serde_json",
+ "sha2 0.10.8",
+ "sha3",
+ "w3f-bls",
+]
+
+[[package]]
 name = "tokio"
 version = "1.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5273,9 +5274,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "w3f-bls"
-version = "0.1.4"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c5da5fa2c6afa2c9158eaa7cd9aee249765eb32b5fb0c63ad8b9e79336a47ec"
+checksum = "7335e4c132c28cc43caef6adb339789e599e39adbe78da0c4d547fad48cbc331"
 dependencies = [
  "ark-bls12-377",
  "ark-bls12-381",

@@ -16,6 +16,7 @@
 
 use beefy::{known_payloads, Commitment, Payload};
 use murmur_core::types::{Identity, IdentityBuilder};
+use rand_core::OsRng;
 use serde::Serialize;
 use w3f_bls::{DoublePublicKey, SerializableToBytes, TinyBLS377};
 use zeroize::Zeroize;
@@ -24,7 +25,7 @@ pub use etf::runtime_types::{
 	bounded_collections::bounded_vec::BoundedVec, node_template_runtime::RuntimeCall,
 };
 pub use murmur_core::{
-	murmur::{Error, MurmurStore, EngineTinyBLS377},
+	murmur::{EngineTinyBLS377, Error, MurmurStore},
 	types::BlockNumber,
 };
 use rand_chacha::ChaCha20Rng;
@@ -46,7 +47,7 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
 			validator_set_id: 0, /* TODO: how to ensure correct validator set ID is used? could
 			                      * just always set to 1 for now, else set input param. */
 		};
-		Identity::new(&commitment.encode())
+		Identity::new(b"", vec![commitment.encode()])
 	}
 }
 
@@ -74,17 +75,16 @@ pub fn create(
 	nonce: u64,
 	block_schedule: Vec<BlockNumber>,
 	round_pubkey_bytes: Vec<u8>,
-	rng: &mut ChaCha20Rng,
-) -> Result<MurmurStore, Error> {
+) -> Result<MurmurStore<EngineTinyBLS377>, Error> {
 	let round_pubkey = DoublePublicKey::<TinyBLS377>::from_bytes(&round_pubkey_bytes)
 		.map_err(|_| Error::InvalidPubkey)?;
 
-	let mmr_store = MurmurStore::<EngineTinyBLS377>::new::<BasicIdBuilder, ChaCha20Rng>(
+	let mmr_store = MurmurStore::<EngineTinyBLS377>::new::<BasicIdBuilder, OsRng, ChaCha20Rng>(
 		seed.clone(),
 		block_schedule.clone(),
 		nonce,
 		round_pubkey,
-		rng,
+		&mut OsRng,
 	)?;
 	seed.zeroize();
 	Ok(mmr_store)
@@ -106,12 +106,10 @@ pub fn create(
 pub fn prepare_execute(
 	mut seed: Vec<u8>,
 	when: BlockNumber,
-	store: MurmurStore,
+	store: MurmurStore<EngineTinyBLS377>,
 	call: &RuntimeCall,
-	rng: &mut ChaCha20Rng,
 ) -> Result<ProxyData, Error> {
-	let (proof, commitment, ciphertext, pos) =
-		store.execute(seed.clone(), when, call.encode(), rng)?;
+	let (proof, commitment, ciphertext, pos) = store.execute(seed.clone(), when, call.encode())?;
 	seed.zeroize();
 	let size = proof.mmr_size();
 	let proof_items: Vec<Vec<u8>> =
@@ -181,14 +179,8 @@ mod tests {
 
 		let when = 1;
 
-		let proxy_data = prepare_execute(
-			seed.clone(),
-			when,
-			mmr_store.clone(),
-			&balance_transfer_call,
-			&mut rng,
-		)
-		.unwrap();
+		let proxy_data =
+			prepare_execute(seed.clone(), when, mmr_store.clone(), &balance_transfer_call).unwrap();
 
 		// let (proof, commitment, ciphertext, _pos) = create_data.mmr_store
 		// 	.execute(seed.clone(), when, balance_transfer_call_2.encode(), &mut rng)
