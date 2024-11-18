@@ -35,7 +35,7 @@ struct Cli {
 	commands: Commands,
 }
 
-/// Commands available to user
+/// Commands available to the user
 #[derive(Subcommand)]
 enum Commands {
 	/// create a new Murmur wallet
@@ -72,11 +72,12 @@ struct WalletExecuteDetails {
 	/// The recipient (ss58 encoded)
 	#[arg(long, short)]
 	to: String,
-	/// The amount to send TODO formatting
+	/// The balance to send
 	#[arg(short, long, value_parser = clap::value_parser!(u128))]
 	amount: u128,
 }
 
+/// Errors that can be thrown by this crate
 #[derive(Error, Debug)]
 pub enum CLIError {
 	#[error("invalid public key")]
@@ -93,8 +94,7 @@ pub enum CLIError {
 	CorruptedMurmurStore,
 }
 
-/// the mmr_store file location
-/// in future, make configurable
+/// The default mmr_store file location
 pub const MMR_STORE_FILEPATH: &str = "mmr_store";
 
 #[tokio::main]
@@ -112,7 +112,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		Commands::Execute(args) => handle_execute(args, client, current_block_number).await?,
 	}
 
-	println!("Elapsed time: {:.2?}", before.elapsed());
+	println!("Done! Time elapsed: {:.2?}", before.elapsed());
+
 	Ok(())
 }
 
@@ -124,16 +125,6 @@ async fn handle_create(
 	round_pubkey_bytes: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let mmr_store = build_mmr_store(args, current_block_number, round_pubkey_bytes, 0)?;
-
-	// sanity check
-	let b: bool = murmur_core::murmur::verifier::verify_update::<w3f_bls::TinyBLS377>(
-		mmr_store.proof.clone(),
-		mmr_store.public_key.clone(),
-		0,
-	).unwrap();
-	assert!(b == true);
-
-	println!("the proof looks good! ok ... proof bytes {:?}, public kye  bytes {:?}", mmr_store.proof.clone(), mmr_store.public_key.clone());
 
 	let call = etf::tx().murmur().create(
 		BoundedVec(args.name.as_bytes().to_vec()),
@@ -177,8 +168,8 @@ async fn handle_update(
 	Ok(())
 }
 
-/// Build a new Murmur store for each block from `current_block_number + 2` to `current_block_number
-/// + args.validity`
+/// Build a new Murmur store for each block from `current_block_number + 2` to
+/// `current_block_number + args.validity`
 fn build_mmr_store(
 	args: &WalletCreationDetails,
 	current_block_number: BlockNumber,
@@ -254,7 +245,7 @@ async fn handle_execute(
 /// else error if unreachable
 async fn idn_connect(
 ) -> Result<(OnlineClient<SubstrateConfig>, BlockNumber, Vec<u8>), Box<dyn std::error::Error>> {
-	println!("🎲 Connecting to Ideal network (local node)");
+	println!("🎲 Connecting to Ideal Network");
 	let ws_url = std::env::var("WS_URL").unwrap_or_else(|_| {
 		let fallback_url = "ws://localhost:9944".to_string();
 		println!("⚠️ WS_URL environment variable not set. Using fallback URL: {}", fallback_url);
@@ -279,17 +270,20 @@ async fn idn_connect(
 }
 
 /// read an MMR from a file
+/// * `path`: The mmr_store path
 fn load_mmr_store(path: &str) -> Result<MurmurStore<EngineTinyBLS377>, CLIError> {
 	let mmr_store_file = File::open(path).expect("Unable to open file");
 	let data: Vec<u8> =
 		serde_cbor::from_reader(mmr_store_file).map_err(|_| CLIError::CorruptedMurmurStore)?;
-	// TODO: create new error type
-	let mmr_store = MurmurStore::<EngineTinyBLS377>::decode(data).unwrap();
+	let mmr_store = MurmurStore::<EngineTinyBLS377>::decode(data).expect("The data is corrupted.");
 	Ok(mmr_store)
 }
 
 /// Write the MMR data to a file
+/// * `mmr_store_data`: The serialized mmr store
+/// * `path`: The file path to write to
 fn write_mmr_store(mmr_store_data: Vec<u8>, path: &str) {
 	let mmr_store_file = File::create(path).expect("It should create the file");
-	serde_cbor::to_writer(mmr_store_file, &mmr_store_data).unwrap();
+	serde_cbor::to_writer(mmr_store_file, &mmr_store_data)
+		.expect("It failed to write to the local filesystem.");
 }

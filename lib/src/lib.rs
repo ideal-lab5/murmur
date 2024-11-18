@@ -44,8 +44,11 @@ impl IdentityBuilder<BlockNumber> for BasicIdBuilder {
 		let commitment = Commitment {
 			payload,
 			block_number: when,
-			validator_set_id: 0, /* TODO: how to ensure correct validator set ID is used? could
-			                      * just always set to 1 for now, else set input param. */
+			// Note: Currently the validator set id is always set to 0 by the IDN runtime.
+			// We have a backlog item to properly update this, which will require
+			// that we properly estimate future validator set ids here
+			// see: https://github.com/ideal-lab5/pallets/issues/29
+			validator_set_id: 0,
 		};
 		Identity::new(b"", vec![commitment.encode()])
 	}
@@ -95,14 +98,6 @@ pub fn create(
 /// * `when`: The block number when OTP codeds should be generated
 /// * `store`: A murmur store
 /// * `call`: Proxied call. Any valid runtime call
-// Note to self: in the future, we can consider ways to prune the murmurstore as OTP codes are
-// consumed     for example, we can take the next values from the map, reducing storage to 0 over
-// time     However, to do this we need to think of a way to prove it with a merkle proof
-//     my thought is that we would have a subtree, so first we prove that the subtree is indeed in
-// the parent MMR     then we prove that the specific leaf is in the subtree.
-//  We could potentially use that idea as a way to optimize the execute function in general. Rather
-// than  loading the entire MMR into memory, we really only need to load a  minimal subtree
-// containing the leaf we want to consume -> add this to the 'future work' section later
 pub fn prepare_execute(
 	mut seed: Vec<u8>,
 	when: BlockNumber,
@@ -120,7 +115,6 @@ pub fn prepare_execute(
 
 #[cfg(test)]
 mod tests {
-	// use super::*;
 	use super::*;
 	use rand_core::{OsRng, SeedableRng};
 
@@ -133,14 +127,6 @@ mod tests {
 		let mmr_store =
 			create(seed.clone(), 0, block_schedule.clone(), double_public_bytes.clone(), &mut rng)
 				.unwrap();
-
-		// let mmr_store = MurmurStore::new::<TinyBLS377, BasicIdBuilder, ChaCha20Rng>(
-		// 	seed,
-		// 	block_schedule,
-		// 	0,
-		// 	DoublePublicKey::<TinyBLS377>::from_bytes(&double_public_bytes).unwrap(),
-		//     &mut rng,
-		// ).unwrap();
 
 		assert_eq!(mmr_store.root.0.len(), 32);
 		assert_eq!(mmr_store.metadata.keys().len(), 7);
@@ -155,10 +141,6 @@ mod tests {
 		let mmr_store =
 			create(seed.clone(), 0, block_schedule, double_public_bytes, &mut rng).unwrap();
 
-		// let size = proof.mmr_size();
-		// let proof_items: Vec<Vec<u8>> =
-		// 	proof.proof_items().iter().map(|leaf| leaf.0.clone()).collect::<Vec<_>>();
-
 		let bob = subxt_signer::sr25519::dev::bob().public_key();
 		let balance_transfer_call =
 			etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
@@ -168,34 +150,13 @@ mod tests {
 				},
 			);
 
-		// let bob2 = subxt_signer::sr25519::dev::bob().public_key();
-		// let balance_transfer_call_2 =
-		//     etf::runtime_types::node_template_runtime::RuntimeCall::Balances(
-		//         etf::balances::Call::transfer_allow_death {
-		//             dest: subxt::utils::MultiAddress::<_, u32>::from(bob2),
-		//             value: 1,
-		//         },
-		//     );
-
 		let when = 1;
 
 		let proxy_data =
 			prepare_execute(seed.clone(), when, mmr_store.clone(), &balance_transfer_call).unwrap();
 
-		// let (proof, commitment, ciphertext, _pos) = create_data.mmr_store
-		// 	.execute(seed.clone(), when, balance_transfer_call_2.encode(), &mut rng)
-		// 	.unwrap();
-		// let expected_commitment = [71, 71, 72, 200, 197, 44, 120, 151, 127, 6, 162, 244, 138,
-		// 122, 196, 183, 30, 47, 111, 239, 225, 32, 57, 141, 186, 229, 164, 113, 113, 44, 131,
-		// 168]; let expected_ciphertext = [76, 42, 82, 184, 114, 58, 31, 205, 146, 16, 41, 191,
-		// 126, 213, 18, 65, 42, 149, 78, 140, 243, 164, 39, 54, 13, 96, 159, 93, 200, 83, 227,
-		// 179]; let size = proof.mmr_size();
-		// let proof_items: Vec<Vec<u8>> =
-		// 	proof.proof_items().iter().map(|leaf| leaf.0.clone()).collect::<Vec<_>>();
 		assert_eq!(proxy_data.position, 0);
 		assert_eq!(proxy_data.hash.len(), 32);
 		assert_eq!(proxy_data.ciphertext.len(), 266);
-		// assert_eq!(proxy_data.proof_items, proof_items);
-		// assert_eq!(proxy_data.size, size);
 	}
 }

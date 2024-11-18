@@ -80,6 +80,8 @@ pub enum Error {
 	InvalidPubkey,
 	/// The ciphertext could not be deserialized to a TLECiphertext
 	CiphertextDeserializationFailed,
+	/// The input could not be deserialized, is it right sized?
+	DeserializationFailure,
 }
 
 pub trait ProtocolEngine {
@@ -370,13 +372,12 @@ fn aes_decrypt<E: EngineBLS>(
 	ciphertext_bytes: Vec<u8>,
 	secret: [u8; 32],
 ) -> Result<Vec<u8>, Error> {
-	// TODO handle errors
 	let ciphertext: TLECiphertext<E> =
 		TLECiphertext::deserialize_compressed(&mut &ciphertext_bytes[..])
 			.map_err(|_| Error::CiphertextDeserializationFailed)?;
 
-	let aes_ct =
-		AESOutput::deserialize_compressed(&mut &ciphertext.message_ciphertext[..]).unwrap();
+	let aes_ct = AESOutput::deserialize_compressed(&mut &ciphertext.body[..])
+		.map_err(|_| Error::DeserializationFailure)?;
 
 	let plaintext =
 		AESGCMStreamCipherProvider::decrypt(aes_ct, secret).map_err(|_| Error::AesDecryptFailed)?;
