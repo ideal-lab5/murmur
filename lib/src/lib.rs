@@ -116,17 +116,14 @@ pub fn prepare_execute(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use rand_core::{OsRng, SeedableRng};
 
 	#[test]
 	pub fn it_can_create_an_mmr_store_and_call_data() {
 		let seed = b"seed".to_vec();
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
 		let mmr_store =
-			create(seed.clone(), 0, block_schedule.clone(), double_public_bytes.clone(), &mut rng)
-				.unwrap();
+			create(seed.clone(), 0, block_schedule.clone(), double_public_bytes.clone()).unwrap();
 
 		assert_eq!(mmr_store.root.0.len(), 32);
 		assert_eq!(mmr_store.metadata.keys().len(), 7);
@@ -137,9 +134,7 @@ mod tests {
 		let seed = b"seed".to_vec();
 		let block_schedule = vec![1, 2, 3, 4, 5, 6, 7];
 		let double_public_bytes = murmur_test_utils::get_dummy_beacon_pubkey();
-		let mut rng = ChaCha20Rng::from_rng(&mut OsRng).unwrap();
-		let mmr_store =
-			create(seed.clone(), 0, block_schedule, double_public_bytes, &mut rng).unwrap();
+		let mmr_store = create(seed.clone(), 0, block_schedule, double_public_bytes).unwrap();
 
 		let bob = subxt_signer::sr25519::dev::bob().public_key();
 		let balance_transfer_call =
@@ -152,11 +147,10 @@ mod tests {
 
 		let when = 1;
 
-		let proxy_data =
-			prepare_execute(seed.clone(), when, mmr_store.clone(), &balance_transfer_call).unwrap();
+		let proxy_data = prepare_execute(seed, when, mmr_store, &balance_transfer_call).unwrap();
 
 		assert_eq!(proxy_data.position, 0);
 		assert_eq!(proxy_data.hash.len(), 32);
-		assert_eq!(proxy_data.ciphertext.len(), 266);
+		assert_eq!(proxy_data.ciphertext.len(), 250);
 	}
 }

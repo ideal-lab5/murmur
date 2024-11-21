@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//! The murmur protocol implementation
+//! The Murmur protocol implementation
 use alloc::{collections::BTreeMap, vec, vec::Vec};
 
 #[cfg(feature = "client")]
@@ -40,12 +40,12 @@ use codec::{Decode, Encode};
 use core::marker::PhantomData;
 use dleq_vrf::{EcVrfVerifier, PublicKey, SecretKey};
 use sha3::Digest;
-use tle::{
+use timelock::{
 	ibe::fullident::Identity,
 	stream_ciphers::{AESGCMStreamCipherProvider, AESOutput, StreamCipherProvider},
 	tlock::*,
 };
-use w3f_bls::{DoublePublicKey, EngineBLS};
+use w3f_bls::DoublePublicKey;
 
 /// The base Murmur protocol label
 pub const MURMUR_PROTO: &[u8] = b"Murmur://";
@@ -63,6 +63,7 @@ pub enum Error {
 	ExecuteError,
 	/// An error occurred when creating a murmur wallet
 	MMRError,
+	/// Some data in the murmur store is corrupted
 	InconsistentStore,
 	/// No leaf could be identified in the MMR at the specified position
 	NoLeafFound,
@@ -92,7 +93,8 @@ pub trait ProtocolEngine {
 /// The supported protocols
 #[derive(Clone, serde::Serialize, serde::Deserialize, Encode, Decode)]
 pub enum ProtocolId {
-	/// small signatures, SignatureGroup = G1 (48 bytes), PublicKeyGroup = G2 (96 bytes)
+	/// A curve config with small signatures and large pubkyes
+	/// SignatureGroup = G1 (48 bytes), PublicKeyGroup = G2 (96 bytes)
 	TinyBLS377,
 }
 
@@ -127,12 +129,22 @@ pub struct MurmurStore<P: ProtocolEngine> {
 
 #[cfg(feature = "client")]
 impl<P: ProtocolEngine> MurmurStore<P> {
-	/// Create a new Murmur store
+	/// Create a new Murmur store.
+	///
+	/// This function allows for two separate RNGs to be specified. In general, the first RNG type R
+	/// should be created externally from this function and passed as an argument.
+	/// In practice, this should probably be the OsRng or something similar.
+	/// The second type of RNG, S, must be seedable from [u8;32]. This RNG is instantiated within
+	/// the function, where we seed a new RNG each time we encrypt a new OTP code using timelock
+	/// encryption.
 	///
 	/// * `seed`: An any-length seed (i.e. password)
 	/// * `block_schedule`: The blocks for which OTP codes will be generated
-	/// * `ephemeral_msk`: Any 32 bytes
+	/// * `nonce`: A value representing the 'number of times' the Murmur wallet has been created or updated.
+	///            Should be monotonically increasing with each subsequent call.
 	/// * `round_public_key`: The IDN beacon's public key
+	/// * `rng`: An instance of an CPRNG of type `R`
+
 	pub fn new<I: IdentityBuilder<BlockNumber>, R, S>(
 		mut seed: Vec<u8>,
 		block_schedule: Vec<BlockNumber>,
@@ -168,6 +180,7 @@ impl<P: ProtocolEngine> MurmurStore<P> {
 		let mut witness: [u8; 32] = transcript.clone().witness(rng).read_byte_array();
 		let totp = BOTPGenerator::new(witness.to_vec()).map_err(|_| Error::InvalidSeed)?;
 
+		// drop secret data
 		witness.zeroize();
 		challenge.zeroize();
 		secret_key.zeroize();
@@ -403,8 +416,8 @@ pub mod verifier {
 	/// Verify the correctness of execution parameters by checking that the Merkle proof, `Proof`,
 	/// and hash `H` are valid. The function outputs true if both conditions are true:
 	///
-	/// 	1. Proof.Verify(root, [(pos, Leaf(ciphertext))])
-	/// 	2. H == Sha256(otp || aux_data)
+	/// 1. Proof.Verify(root, [(pos, Leaf(ciphertext))])
+	/// 2. H == Sha256(otp || aux_data)
 	////
 	/// It outputs false otherwise.
 	///
@@ -489,7 +502,7 @@ mod tests {
 	pub struct DummyIdBuilder;
 	impl IdentityBuilder<BlockNumber> for DummyIdBuilder {
 		fn build_identity(at: BlockNumber) -> Identity {
-			Identity::new(&[at as u8])
+			Identity::new(b"", vec![vec![at as u8]])
 		}
 	}
 
