@@ -32,7 +32,7 @@ To generate a wallet valid for the next 1000 blocks, use:
 To send a balance transfer, use:
 
 ```shell
-./target/debug/murmur execute --name test --seed my_secret_key --to CuqfkE3QieYPAWPpwiygDufmyrKecDcVCF7PN1psaLEn8yr --amount 100_000_000
+./target/debug/murmur execute --name test --seed my_secret_key --to CuqfkE3QieYPAWPpwiygDufmyrKecDcVCF7PN1psaLEn8yr --amount 100000000
 ```
 
 ## Test

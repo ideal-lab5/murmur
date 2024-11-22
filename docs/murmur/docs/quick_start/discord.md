@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Murmur on Discord
 
-The [murmur-discord-bot](https://github.com/ideal-lab5/murmur-bots/tree/main/discord), built with [discord.js](https://discord.js.org/) and [murmur.js](https://github.com/ideal-lab5/murmur.js), enables Discord users to easily and securely create and execute crypto transactions on the Ideal Network from within Discord itself. This provides powerful new crypto capabilities for Discord, enabling both discord-wide wallets that can be used interoperably between servers, as well as server-specific crypto wallets and all of the economic implications that come with it. 
+The [murmur discord bot](https://github.com/ideal-lab5/murmur-bots/tree/main/src/discord.js), built with [discord.js](https://discord.js.org/) and [murmur.js](https://github.com/ideal-lab5/murmur.js), enables Discord users to easily and securely create and execute crypto transactions on the Ideal Network from within Discord itself. This provides powerful new crypto capabilities for Discord, enabling both discord-wide wallets that can be used interoperably between servers, as well as server-specific crypto wallets and all of the economic implications that come with it. 
 
 <div style={{ textAlign: 'center' }}>
 ![discord_bot](../../assets/discord_bot_in_action.png)

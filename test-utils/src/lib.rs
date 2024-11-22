@@ -25,9 +25,7 @@ use w3f_bls::{DoublePublicKey, DoublePublicKeyScheme, TinyBLS377};
 
 extern crate alloc;
 
-pub use murmur_core::otp::BOTPGenerator;
-
-pub use murmur_core::murmur::MurmurStore;
+pub use murmur_core::{murmur::MurmurStore, otp::BOTPGenerator};
 
 pub fn get_dummy_beacon_pubkey() -> Vec<u8> {
 	let keypair = w3f_bls::KeypairVT::<TinyBLS377>::generate(&mut OsRng);
