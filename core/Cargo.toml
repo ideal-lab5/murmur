@@ -21,7 +21,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 totp-rs = { version = "5.5.1", default-features = false, optional = true }
 codec = { package = "parity-scale-codec", version = "3.6.12", features = ["derive"], default-features = false }
-timelock = { git = "https://github.com/ideal-lab5/tle.git", default-features =  false }
+timelock = { git = "https://github.com/ideal-lab5/timelock.git", default-features =  false }
 ckb-merkle-mountain-range = { version = "0.5.2", default-features = false }
 sha3 = { version = "0.10.8", default-features = false }
 serde = { version = "1.0.188", features = ["alloc", "derive"], default-features = false }

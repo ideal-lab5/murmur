@@ -48,7 +48,7 @@ let murmur_store = MurmurStore::<EngineTinyBLS377>::new::<
 ```
 #### Update a Murmur Store
 
-Updating a Murmur store is done by calling the same new function as above and incrementing the previous nonce by 1. The data any single MMR can contain is finite, so when a Murmur wallet is created it can only be functional for a finite number of blocks (the block schedule). In this sense, Murmur is a "session-based" wallet. To ensure wallet lifetimes can be extended, Murmur wallets can be updated by generated a new Murmur store and submitting the result to a system that implements a verifier (see below). More specifically, when a Murmur store is created a DLEQ proof is generated (Discrete Log Equivalence Proof - a type of zkp) and attached to the store. This proof allows the Murmur store creator to convince a verifier that it knows the secret input (seed) without exposing it.
+Updating a Murmur store is done by calling the same `new` function as above and incrementing the previous nonce by 1. The data any single MMR can contain is finite, so when a Murmur wallet is created it can only be functional for a finite number of blocks (the block schedule). In this sense, Murmur is a "session-based" wallet. To ensure wallet lifetimes can be extended, Murmur wallets can be updated by generating a new Murmur store and submitting the result to a system that implements a verifier (see below). More specifically, when a Murmur store is created a DLEQ proof is generated (Discrete Log Equivalence Proof - a type of zkp) and attached to the store. This proof allows the Murmur store creator to convince a verifier that it knows the secret input (seed) without exposing it.
 
 ``` rust
 // Compute the next nonce
@@ -90,8 +90,8 @@ verifier::verify_update::<TinyBLS377>(proof, public_key, nonce).unwrap()
 
 #### Verify Execution Parameters
 
-This function allows for "tmelocked" commitments to be verified. The OTP input should be the timelock decrypted ciphertext. More specifically, it:
-1) Verified a Merkle proof to prove that the ciphertext is indeed at the given position in the MMR defined by the given root.
+This function allows for "timelocked" commitments to be verified. The OTP input should be the timelock decrypted ciphertext. More specifically, it:
+1) verifies a Merkle proof to prove that the ciphertext is indeed at the given position in the MMR defined by the given root.
 2) reconstructs the commitment and compares it against the given one
 
 ``` rust
